@@ -66,7 +66,13 @@ async function api(method, body, query = "") {
   } catch {
     data = { error: text || r.statusText };
   }
-  if (!r.ok) throw new Error(data?.error || r.statusText || "Anfrage fehlgeschlagen");
+  const errMsg =
+    data?.error ||
+    data?.message ||
+    (typeof data === "string" ? data : null) ||
+    r.statusText ||
+    "Anfrage fehlgeschlagen";
+  if (!r.ok) throw new Error(errMsg);
   return data;
 }
 

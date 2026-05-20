@@ -125,19 +125,28 @@ Deno.serve(async (req) => {
   if (authErr || !user) return json({ error: "Nicht angemeldet" }, 401, c);
 
   const service = createClient(supabaseUrl, serviceKey);
-  const urlaub = createClient(supabaseUrl, serviceKey, {
-    db: { schema: "urlaub" },
-  });
   const kalender = createClient(supabaseUrl, serviceKey, {
     db: { schema: "team_kalender" },
   });
 
-  const { data: profile } = await service
+  let profile: { full_name?: string; email?: string; app_role?: string } | null = null;
+  const profUsers = await service
     .schema("users")
     .from("profiles")
     .select("id,full_name,email,app_role")
     .eq("id", user.id)
     .maybeSingle();
+  if (profUsers.error) {
+    const profPublic = await service
+      .from("profiles")
+      .select("id,full_name,email,app_role")
+      .eq("id", user.id)
+      .maybeSingle();
+    if (profPublic.error) throw profPublic.error;
+    profile = profPublic.data;
+  } else {
+    profile = profUsers.data;
+  }
 
   const isAdmin = profile?.app_role === "admin";
   const displayName = (profile?.full_name || profile?.email || "Nutzer").trim();
@@ -147,15 +156,15 @@ Deno.serve(async (req) => {
       const scope = new URL(req.url).searchParams.get("scope") || "mine";
       if (scope === "admin") {
         if (!isAdmin) return json({ error: "Keine Berechtigung" }, 403, c);
-        const { data, error } = await urlaub
-          .from("requests")
+        const { data, error } = await service
+          .from("urlaub_requests")
           .select("*")
           .order("created_at", { ascending: false });
         if (error) throw error;
         return json((data ?? []).map((r) => rowOut(r as Record<string, unknown>)), 200, c);
       }
-      const { data, error } = await urlaub
-        .from("requests")
+      const { data, error } = await service
+        .from("urlaub_requests")
         .select("*")
         .eq("user_id", user.id)
         .order("created_at", { ascending: false });
@@ -196,8 +205,8 @@ Deno.serve(async (req) => {
         const id = String(body.id ?? "").trim();
         if (!id) return json({ error: "id erforderlich" }, 400, c);
 
-        const { data: reqRow, error: loadErr } = await urlaub
-          .from("requests")
+        const { data: reqRow, error: loadErr } = await service
+          .from("urlaub_requests")
           .select("*")
           .eq("id", id)
           .maybeSingle();
@@ -212,8 +221,8 @@ Deno.serve(async (req) => {
             body.reason == null || body.reason === ""
               ? null
               : String(body.reason).trim();
-          const { data, error } = await urlaub
-            .from("requests")
+          const { data, error } = await service
+            .from("urlaub_requests")
             .update({
               status: "rejected",
               reviewed_by: user.id,
@@ -248,8 +257,8 @@ Deno.serve(async (req) => {
           .single();
         if (evErr) throw evErr;
 
-        const { data, error } = await urlaub
-          .from("requests")
+        const { data, error } = await service
+          .from("urlaub_requests")
           .update({
             status: "approved",
             reviewed_by: user.id,
@@ -270,6 +279,7 @@ Deno.serve(async (req) => {
 
     return json({ error: "Methode nicht erlaubt" }, 405, c);
   } catch (e) {
+    console.error("[urlaubsplanung]", e);
     const msg = e instanceof Error ? e.message : "Interner Fehler";
     return json({ error: msg }, 500, c);
   }
