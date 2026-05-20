@@ -103,6 +103,81 @@ function rowOut(r: Record<string, unknown>) {
   };
 }
 
+function countDays(start: string, end: string): number {
+  const a = new Date(`${start}T12:00:00`);
+  const b = new Date(`${end}T12:00:00`);
+  return Math.round((b.getTime() - a.getTime()) / 86400000) + 1;
+}
+
+const DEFAULT_URLAUBSTAGE = 30;
+
+function getUrlaubstage(profile: { urlaubstage?: number | null } | null): number {
+  const n = profile?.urlaubstage;
+  if (typeof n === "number" && Number.isFinite(n)) return Math.max(0, Math.floor(n));
+  return DEFAULT_URLAUBSTAGE;
+}
+
+async function loadProfile(
+  service: ReturnType<typeof createClient>,
+  userId: string,
+) {
+  const profUsers = await service
+    .schema("users")
+    .from("profiles")
+    .select("id,full_name,email,app_role,urlaubstage")
+    .eq("id", userId)
+    .maybeSingle();
+  if (!profUsers.error) return profUsers;
+  return service
+    .from("profiles")
+    .select("id,full_name,email,app_role,urlaubstage")
+    .eq("id", userId)
+    .maybeSingle();
+}
+
+async function deductUrlaubstage(
+  service: ReturnType<typeof createClient>,
+  userId: string,
+  days: number,
+) {
+  const { data, error } = await service
+    .schema("users")
+    .from("profiles")
+    .select("urlaubstage")
+    .eq("id", userId)
+    .single();
+  if (error) throw error;
+  const current = getUrlaubstage(data);
+  if (days > current) {
+    throw new Error(`Nicht genug Urlaubstage (${current} verfügbar)`);
+  }
+  const { error: updErr } = await service
+    .schema("users")
+    .from("profiles")
+    .update({
+      urlaubstage: current - days,
+      updated_at: new Date().toISOString(),
+    })
+    .eq("id", userId);
+  if (updErr) throw updErr;
+}
+
+function sumDaysForYear(
+  rows: Array<{ start_date: string; end_date: string; status: string }>,
+  year: number,
+  statuses: Set<string>,
+): number {
+  let total = 0;
+  for (const row of rows) {
+    if (!statuses.has(row.status)) continue;
+    const startYear = Number(row.start_date.slice(0, 4));
+    const endYear = Number(row.end_date.slice(0, 4));
+    if (startYear > year || endYear < year) continue;
+    total += countDays(row.start_date, row.end_date);
+  }
+  return total;
+}
+
 Deno.serve(async (req) => {
   const c = corsHeaders(req);
   if (req.method === "OPTIONS") return new Response("ok", { headers: c });
@@ -129,24 +204,14 @@ Deno.serve(async (req) => {
     db: { schema: "team_kalender" },
   });
 
-  let profile: { full_name?: string; email?: string; app_role?: string } | null = null;
-  const profUsers = await service
-    .schema("users")
-    .from("profiles")
-    .select("id,full_name,email,app_role")
-    .eq("id", user.id)
-    .maybeSingle();
-  if (profUsers.error) {
-    const profPublic = await service
-      .from("profiles")
-      .select("id,full_name,email,app_role")
-      .eq("id", user.id)
-      .maybeSingle();
-    if (profPublic.error) throw profPublic.error;
-    profile = profPublic.data;
-  } else {
-    profile = profUsers.data;
-  }
+  const profRes = await loadProfile(service, user.id);
+  if (profRes.error) throw profRes.error;
+  const profile = profRes.data as {
+    full_name?: string;
+    email?: string;
+    app_role?: string;
+    urlaubstage?: number | null;
+  } | null;
 
   const isAdmin = profile?.app_role === "admin";
   const displayName = (profile?.full_name || profile?.email || "Nutzer").trim();
@@ -154,6 +219,31 @@ Deno.serve(async (req) => {
   try {
     if (req.method === "GET") {
       const scope = new URL(req.url).searchParams.get("scope") || "mine";
+      if (scope === "balance") {
+        const year = new Date().getFullYear();
+        const remaining = getUrlaubstage(profile);
+        const { data: mine, error: mineErr } = await service
+          .from("urlaub_requests")
+          .select("start_date,end_date,status")
+          .eq("user_id", user.id);
+        if (mineErr) throw mineErr;
+        const rows = (mine ?? []) as Array<{
+          start_date: string;
+          end_date: string;
+          status: string;
+        }>;
+        const pending = sumDaysForYear(rows, year, new Set(["pending"]));
+        return json(
+          {
+            year,
+            remaining,
+            pending,
+            default_annual: DEFAULT_URLAUBSTAGE,
+          },
+          200,
+          c,
+        );
+      }
       if (scope === "admin") {
         if (!isAdmin) return json({ error: "Keine Berechtigung" }, 403, c);
         const { data, error } = await service
@@ -184,8 +274,35 @@ Deno.serve(async (req) => {
         if (!start_date || !end_date || end_date < start_date) {
           return json({ error: "Ungültiger Zeitraum" }, 400, c);
         }
-        const { data, error } = await urlaub
-          .from("requests")
+        const requestedDays = countDays(start_date, end_date);
+        const year = Number(start_date.slice(0, 4));
+        const annual = getUrlaubstage(profile);
+        if (annual > 0) {
+          const { data: mine, error: mineErr } = await service
+            .from("urlaub_requests")
+            .select("start_date,end_date,status")
+            .eq("user_id", user.id);
+          if (mineErr) throw mineErr;
+          const rows = (mine ?? []) as Array<{
+            start_date: string;
+            end_date: string;
+            status: string;
+          }>;
+          const used = sumDaysForYear(rows, year, new Set(["approved"]));
+          const pending = sumDaysForYear(rows, year, new Set(["pending"]));
+          const remaining = annual - used - pending;
+          if (requestedDays > remaining) {
+            return json(
+              {
+                error: `Nicht genug Urlaubstage (${remaining} von ${annual} verfügbar)`,
+              },
+              400,
+              c,
+            );
+          }
+        }
+        const { data, error } = await service
+          .from("urlaub_requests")
           .insert({
             user_id: user.id,
             applicant_name: displayName,
@@ -236,6 +353,12 @@ Deno.serve(async (req) => {
           if (error) throw error;
           return json(rowOut(data as Record<string, unknown>), 200, c);
         }
+
+        const approvedDays = countDays(
+          reqRow.start_date as string,
+          reqRow.end_date as string,
+        );
+        await deductUrlaubstage(service, reqRow.user_id as string, approvedDays);
 
         const member = await ensureTeamMember(
           kalender,

@@ -9,6 +9,7 @@ const STATUS = {
 let sb = null;
 let isAdmin = false;
 let requests = [];
+let balance = null;
 let rejectTargetId = null;
 
 const els = {};
@@ -108,6 +109,12 @@ async function refreshRole() {
   }
 }
 
+async function loadBalance() {
+  if (isAdmin) return;
+  balance = await api("GET", null, "?scope=balance");
+  updateStats();
+}
+
 async function loadRequests() {
   const scope = isAdmin ? "admin" : "mine";
   requests = (await api("GET", null, `?scope=${scope}`)) || [];
@@ -117,6 +124,12 @@ async function loadRequests() {
 
 function updateStats() {
   if (!isAdmin) {
+    if (balance && els.statRemaining) {
+      const { remaining, pending, default_annual } = balance;
+      els.statRemaining.textContent = String(remaining ?? 0);
+      const pendingHint = pending > 0 ? `, ${pending} in offenen Anträgen reserviert` : "";
+      els.statRemaining.title = `${remaining} von ${default_annual ?? 30} Urlaubstagen verfügbar${pendingHint}`;
+    }
     const pending = requests.filter((r) => r.status === "pending").length;
     els.statPending.textContent = String(pending);
     els.statApproved.textContent = String(requests.filter((r) => r.status === "approved").length);
@@ -245,6 +258,7 @@ async function handleSubmit(e) {
     const today = new Date().toISOString().slice(0, 10);
     els.fStart.value = today;
     els.fEnd.value = today;
+    if (!isAdmin) await loadBalance();
     await loadRequests();
   } catch (err) {
     toast(err.message || "Einreichung fehlgeschlagen", "err");
@@ -270,6 +284,7 @@ function showLogin() {
 async function bootApp() {
   try {
     await refreshRole();
+    if (!isAdmin) await loadBalance();
     await loadRequests();
     showDashboard();
   } catch (e) {
@@ -302,6 +317,7 @@ function cacheEls() {
   els.fNote = document.getElementById("f-note");
   els.btnSubmit = document.getElementById("btn-submit");
   els.myList = document.getElementById("my-requests");
+  els.statRemaining = document.getElementById("stat-remaining");
   els.statPending = document.getElementById("stat-pending");
   els.statApproved = document.getElementById("stat-approved");
   els.userPanel = document.getElementById("user-panel");
