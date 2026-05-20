@@ -1,0 +1,409 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Urlaubsplanung – ROOTS</title>
+  <link rel="stylesheet" href="https://fonts.cdnfonts.com/css/circular-std" />
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css" crossorigin="anonymous" />
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <style>
+    :root {
+      --brand: #206efb; --brand-dark: #165fd9; --brand-light: #eff6ff;
+      --ink: #0f172a; --muted: #475569; --bg: #fff; --line: #e2e8f0;
+      --status-bg: #f8fafc; --radius: 16px; --radius-pill: 999px;
+      --shadow: 0 6px 20px rgba(15,23,42,.08);
+      --shadow-modal: 0 20px 50px rgba(0,0,0,.2);
+      --shadow-focus: 0 0 0 3px rgba(32,110,251,.15);
+      --app-bg: #f4f7fb; --radius-dash: 14px; --shadow-dash: 0 4px 16px rgba(15,23,42,.08);
+      --app-max-w: 1100px; --app-side-pad: 1.5rem;
+      --app-shell-w: min(var(--app-max-w), calc(100% - 2 * var(--app-side-pad)));
+      --success: #10b981; --success-light: #ecfdf5;
+      --warn: #f59e0b; --warn-light: #fffbeb;
+      --danger: #dc2626; --danger-light: #fef2f2;
+    }
+    @media (prefers-color-scheme: dark) {
+      :root {
+        --brand: #3b82f6; --brand-dark: #60a5fa; --brand-light: #1e3a8a;
+        --ink: #f8fafc; --muted: #94a3b8; --bg: #0f172a; --line: #334155;
+        --status-bg: #1e293b; --app-bg: #0b1220;
+        --success-light: #064e3b; --warn-light: #422006; --danger-light: #450a0a;
+      }
+    }
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    html, body {
+      min-height: 100%; font-family: 'Circular Std', system-ui, sans-serif;
+      color: var(--ink); background: var(--status-bg); -webkit-font-smoothing: antialiased;
+    }
+    body.body-dashboard { background: var(--app-bg); }
+
+    /* Login */
+    #screen-login {
+      min-height: 100vh; display: none; align-items: center; justify-content: center; padding: 2rem 1rem;
+    }
+    .login-card {
+      background: var(--bg); border-radius: var(--radius); box-shadow: var(--shadow-modal);
+      width: 100%; max-width: 440px; padding: 3rem 2.5rem;
+    }
+    .logo-wrap { text-align: center; margin-bottom: 2rem; }
+    .logo-wrap img { height: 32px; }
+    .card-title { font-size: 1.5rem; font-weight: 700; text-align: center; margin-bottom: .4rem; }
+    .card-sub { font-size: .95rem; color: var(--muted); text-align: center; margin-bottom: 2rem; }
+    .form-group { margin-bottom: 1.25rem; }
+    label { display: block; font-size: .875rem; font-weight: 500; color: var(--muted); margin-bottom: .4rem; }
+    .input-wrap { position: relative; }
+    .input-wrap .icon { position: absolute; left: 14px; top: 50%; transform: translateY(-50%); color: var(--muted); font-size: .875rem; pointer-events: none; }
+    input[type="email"], input[type="password"], input[type="date"], textarea {
+      width: 100%; border: 1px solid var(--line); border-radius: 8px;
+      font-family: inherit; font-size: .95rem; color: var(--ink); background: var(--bg);
+      outline: none; transition: border-color .2s, box-shadow .2s;
+    }
+    input[type="email"], input[type="password"] { height: 44px; padding: 0 12px 0 38px; }
+    input[type="date"] { height: 44px; padding: 0 12px; }
+    textarea { padding: 12px; min-height: 88px; resize: vertical; }
+    input:focus, textarea:focus { border-color: var(--brand); box-shadow: var(--shadow-focus); }
+    .btn-primary {
+      display: inline-flex; align-items: center; justify-content: center; gap: .5rem;
+      padding: .8rem 1.6rem; background: var(--brand); color: #fff; border: none;
+      border-radius: var(--radius-pill); font-family: inherit; font-size: 1rem; font-weight: 500;
+      cursor: pointer; box-shadow: var(--shadow); transition: all .25s;
+    }
+    .btn-primary:hover { background: var(--brand-dark); transform: translateY(-1px); }
+    .btn-primary:disabled { background: #cbd5e1; color: #64748b; transform: none; cursor: not-allowed; }
+    .btn-primary--block { width: 100%; }
+    .alert { border-radius: 8px; padding: .85rem 1rem; font-size: .9rem; display: none; align-items: flex-start; gap: .6rem; margin-bottom: 1.25rem; }
+    .alert.visible { display: flex; }
+    .alert-error { background: var(--status-bg); border-left: 4px solid var(--ink); }
+
+    /* Dashboard shell */
+    #screen-dashboard { display: none; min-height: 100vh; }
+    #screen-dashboard .sop-header, #screen-dashboard .dash-main {
+      width: var(--app-shell-w); max-width: var(--app-max-w); margin-left: auto; margin-right: auto;
+    }
+    .sop-header {
+      display: flex; align-items: center; justify-content: space-between;
+      padding: .8rem 1.5rem; min-height: 64px; background: var(--bg); border: 1px solid var(--line);
+      border-radius: var(--radius); box-shadow: var(--shadow); gap: 14px; margin: 1rem auto 1rem;
+    }
+    .header-left { display: flex; align-items: center; gap: 10px; flex: 1; min-width: 0; }
+    .logo-mark { width: 28px; height: 28px; border-radius: 7px; background: var(--brand); display: flex; align-items: center; justify-content: center; flex-shrink: 0; }
+    .wordmark { font-size: 14px; font-weight: 700; color: var(--ink); white-space: nowrap; }
+    .wordmark span { color: var(--brand); }
+    .header-divider { width: 1px; height: 16px; background: var(--line); }
+    .header-sub { font-size: 12px; color: var(--muted); }
+    .header-right { display: flex; align-items: center; gap: 8px; }
+    .dash-avatar { width: 32px; height: 32px; border-radius: 50%; background: var(--brand-light); color: var(--brand); display: flex; align-items: center; justify-content: center; font-weight: 700; font-size: .8rem; }
+    .role-badge {
+      font-size: .72rem; font-weight: 700; text-transform: uppercase; letter-spacing: .05em;
+      padding: .35rem .65rem; border-radius: 999px; background: var(--brand-light); color: var(--brand);
+    }
+    .role-badge--admin { background: var(--warn-light); color: #b45309; }
+
+    .dash-main { padding: 0 0 4rem; animation: fadeIn .35s ease; }
+    @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
+    .greeting { margin-bottom: 1.75rem; }
+    .greeting h1 { font-size: 1.75rem; font-weight: 700; margin-bottom: .35rem; }
+    .greeting p { color: var(--muted); font-size: 1rem; line-height: 1.55; max-width: 52rem; }
+
+    .stats-row { display: grid; grid-template-columns: repeat(auto-fit, minmax(160px, 1fr)); gap: 1rem; margin-bottom: 1.75rem; }
+    .stat-card {
+      background: var(--bg); border-radius: var(--radius-dash); padding: 1.1rem 1.25rem;
+      box-shadow: var(--shadow-dash); border: 1px solid var(--line);
+    }
+    .stat-label { font-size: .8rem; color: var(--muted); margin-bottom: .35rem; }
+    .stat-value { font-size: 1.6rem; font-weight: 700; color: var(--brand); }
+
+    .layout-grid { display: grid; grid-template-columns: 1fr 1.1fr; gap: 1.25rem; align-items: start; }
+    @media (max-width: 900px) { .layout-grid { grid-template-columns: 1fr; } }
+
+    .panel {
+      background: var(--bg); border-radius: var(--radius-dash); padding: 1.35rem 1.5rem;
+      box-shadow: var(--shadow-dash); border: 1px solid var(--line);
+    }
+    .panel-title { font-size: 1.05rem; font-weight: 700; margin-bottom: 1rem; display: flex; align-items: center; gap: .5rem; }
+    .panel-title i { color: var(--brand); }
+    .date-row { display: grid; grid-template-columns: 1fr 1fr; gap: .75rem; }
+    .form-actions { margin-top: 1.25rem; }
+
+    .req-list { display: flex; flex-direction: column; gap: .75rem; }
+    .req-card {
+      border: 1px solid var(--line); border-radius: 12px; padding: 1rem 1.1rem; background: var(--status-bg);
+    }
+    .req-card-top { display: flex; justify-content: space-between; align-items: flex-start; gap: .75rem; margin-bottom: .5rem; }
+    .req-name { font-size: 1rem; font-weight: 700; }
+    .req-range { font-size: .88rem; color: var(--muted); margin-top: .15rem; }
+    .req-note, .req-reject-reason, .req-cal-hint { font-size: .88rem; color: var(--muted); margin-top: .5rem; line-height: 1.45; }
+    .req-cal-hint { color: var(--success); }
+    .req-reject-reason { color: var(--danger); }
+    .status-pill {
+      display: inline-flex; align-items: center; gap: 5px; font-size: .75rem; font-weight: 700;
+      padding: .3rem .65rem; border-radius: 999px; white-space: nowrap;
+    }
+    .status--pending { background: var(--warn-light); color: #b45309; }
+    .status--approved { background: var(--success-light); color: var(--success); }
+    .status--rejected { background: var(--danger-light); color: var(--danger); }
+    .req-actions { display: flex; flex-wrap: wrap; gap: .5rem; margin-top: .85rem; }
+    .btn-approve, .btn-reject {
+      display: inline-flex; align-items: center; gap: 6px; padding: .55rem 1rem;
+      border-radius: 999px; font-family: inherit; font-size: .85rem; font-weight: 600; cursor: pointer; border: none;
+    }
+    .btn-approve { background: var(--success); color: #fff; }
+    .btn-approve:hover { filter: brightness(1.05); }
+    .btn-reject { background: var(--bg); border: 1px solid var(--line); color: var(--ink); }
+    .btn-reject:hover { border-color: var(--danger); color: var(--danger); }
+
+    .admin-section { margin-bottom: 1.5rem; }
+    .admin-section h3 { font-size: .92rem; font-weight: 700; margin-bottom: .75rem; color: var(--muted); text-transform: uppercase; letter-spacing: .04em; }
+    .empty-state { text-align: center; padding: 2rem 1rem; color: var(--muted); }
+    .empty-state i { font-size: 2rem; opacity: .35; margin-bottom: .75rem; display: block; }
+
+    /* Modal */
+    .modal-overlay {
+      display: none; position: fixed; inset: 0; z-index: 10000;
+      background: rgba(15,23,42,.55); backdrop-filter: blur(4px);
+      align-items: center; justify-content: center; padding: 1rem;
+    }
+    .modal-overlay.is-open { display: flex; }
+    .modal-box {
+      background: var(--bg); border-radius: var(--radius); box-shadow: var(--shadow-modal);
+      width: 100%; max-width: 420px; padding: 1.75rem;
+    }
+    .modal-box h2 { font-size: 1.15rem; margin-bottom: .5rem; }
+    .modal-box p { color: var(--muted); font-size: .9rem; margin-bottom: 1rem; }
+    .modal-actions { display: flex; gap: .65rem; margin-top: 1rem; }
+    .btn-secondary {
+      flex: 1; padding: .7rem 1rem; background: var(--status-bg); border: 1px solid var(--line);
+      border-radius: var(--radius-pill); font-family: inherit; font-weight: 500; color: var(--muted); cursor: pointer;
+    }
+    .btn-secondary:hover { border-color: var(--brand); color: var(--brand); }
+
+    #toast-container {
+      position: fixed; bottom: 24px; right: 24px; z-index: 99999;
+      display: flex; flex-direction: column; gap: 10px; pointer-events: none;
+    }
+    .toast {
+      background: var(--bg); color: var(--ink); padding: 12px 18px; border-radius: 12px;
+      box-shadow: 0 10px 30px rgba(0,0,0,.12); display: flex; align-items: center; gap: 10px;
+      font-size: .9rem; font-weight: 500; border-left: 4px solid var(--brand);
+      animation: toastIn .3s ease;
+    }
+    .toast.error { border-left-color: var(--danger); }
+    .toast.success { border-left-color: var(--success); }
+    @keyframes toastIn { from { opacity: 0; transform: translateX(24px); } to { opacity: 1; transform: none; } }
+    .toast.fade-out { animation: toastOut .25s ease forwards; }
+    @keyframes toastOut { to { opacity: 0; transform: scale(.96); } }
+    @keyframes spin { to { transform: rotate(360deg); } }
+    .roots-spin { animation: spin .8s linear infinite; }
+  </style>
+</head>
+<body>
+
+<div id="toast-container" aria-live="polite"></div>
+
+<!-- Login -->
+<div id="screen-login" class="page">
+  <div class="login-card">
+    <div class="logo-wrap">
+      <img src="https://roots-consultants.de/wp-content/uploads/2025/04/Roots-Brand-Strategy-Consultants-Logo.svg" alt="ROOTS" />
+    </div>
+    <h1 class="card-title">Urlaubsplanung</h1>
+    <p class="card-sub">Melde dich mit deinem ROOTS-Konto an.</p>
+    <div id="login-error" class="alert alert-error"><i class="fa-solid fa-circle-exclamation"></i><span id="login-error-text"></span></div>
+    <form id="form-login" novalidate>
+      <div class="form-group">
+        <label for="login-email">E-Mail</label>
+        <div class="input-wrap">
+          <i class="fa-regular fa-envelope icon"></i>
+          <input type="email" id="login-email" autocomplete="email" required placeholder="name@roots-consultants.com" />
+        </div>
+      </div>
+      <div class="form-group">
+        <label for="login-password">Passwort</label>
+        <div class="input-wrap">
+          <i class="fa-solid fa-lock icon"></i>
+          <input type="password" id="login-password" autocomplete="current-password" required placeholder="••••••••" />
+        </div>
+      </div>
+      <button type="submit" class="btn-primary btn-primary--block" id="btn-login">
+        <i class="fa-solid fa-arrow-right-to-bracket"></i> Anmelden
+      </button>
+    </form>
+  </div>
+</div>
+
+<!-- Dashboard -->
+<div id="screen-dashboard">
+  <header class="sop-header">
+    <div class="header-left">
+      <div class="logo-mark" aria-hidden="true">
+        <svg viewBox="0 0 16 16" fill="none" width="16" height="16"><rect x="2" y="2" width="5" height="5" rx="1.5" fill="white" opacity=".9"/><rect x="9" y="2" width="5" height="5" rx="1.5" fill="white" opacity=".6"/><rect x="2" y="9" width="5" height="5" rx="1.5" fill="white" opacity=".6"/><rect x="9" y="9" width="5" height="5" rx="1.5" fill="white" opacity=".3"/></svg>
+      </div>
+      <span class="wordmark">ROOTS <span>URLAUB</span></span>
+      <div class="header-divider"></div>
+      <span class="header-sub">Urlaub einreichen &amp; freigeben</span>
+    </div>
+    <div class="header-right">
+      <span class="role-badge" id="user-badge">Mitarbeiter</span>
+      <span class="role-badge role-badge--admin" id="admin-badge" hidden>Admin</span>
+      <div class="dash-avatar" id="user-avatar" style="cursor:pointer" title="Profil"></div>
+      <span id="user-name-topbar" class="header-sub"></span>
+    </div>
+  </header>
+
+  <div class="dash-main">
+    <div class="greeting">
+      <h1 id="greeting-text">Hallo!</h1>
+      <p id="greeting-desc">Reiche hier deinen Urlaub ein. Nach der Freigabe durch einen Admin wird er automatisch im Team-Kalender eingetragen.</p>
+    </div>
+
+    <!-- User view -->
+    <div id="user-panel">
+      <div class="stats-row" id="user-stats">
+        <div class="stat-card"><div class="stat-label">Offen</div><div class="stat-value" id="stat-pending">0</div></div>
+        <div class="stat-card"><div class="stat-label">Genehmigt</div><div class="stat-value" id="stat-approved">0</div></div>
+      </div>
+      <div class="layout-grid">
+        <section class="panel">
+          <h2 class="panel-title"><i class="fa-solid fa-paper-plane"></i> Urlaub einreichen</h2>
+          <form id="form-request">
+            <div class="date-row">
+              <div class="form-group">
+                <label for="f-start">Von</label>
+                <input type="date" id="f-start" required />
+              </div>
+              <div class="form-group">
+                <label for="f-end">Bis</label>
+                <input type="date" id="f-end" required />
+              </div>
+            </div>
+            <div class="form-group">
+              <label for="f-note">Notiz (optional)</label>
+              <textarea id="f-note" placeholder="z. B. Vertretung, Erreichbarkeit …"></textarea>
+            </div>
+            <div class="form-actions">
+              <button type="submit" class="btn-primary btn-primary--block" id="btn-submit">
+                <i class="fa-solid fa-umbrella-beach"></i> Antrag einreichen
+              </button>
+            </div>
+          </form>
+        </section>
+        <section class="panel">
+          <h2 class="panel-title"><i class="fa-solid fa-list"></i> Meine Anträge</h2>
+          <div class="req-list" id="my-requests"></div>
+        </section>
+      </div>
+    </div>
+
+    <!-- Admin view -->
+    <div id="admin-panel" hidden>
+      <div class="stats-row">
+        <div class="stat-card">
+          <div class="stat-label">Offene Anträge</div>
+          <div class="stat-value" id="admin-pending-count">0</div>
+        </div>
+      </div>
+      <p style="color:var(--muted);margin-bottom:1.25rem;font-size:.95rem;">
+        Genehmigte Urlaube werden automatisch als Eintrag im Team-Kalender angelegt.
+      </p>
+      <div class="admin-section">
+        <h3>Zur Freigabe</h3>
+        <div class="req-list" id="admin-pending-list"></div>
+      </div>
+      <div class="admin-section">
+        <h3>Bearbeitet</h3>
+        <div class="req-list" id="admin-history-list"></div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="modal-overlay" id="reject-modal" aria-hidden="true">
+  <div class="modal-box" role="dialog" aria-labelledby="reject-title">
+    <h2 id="reject-title">Antrag ablehnen</h2>
+    <p>Optional kannst du einen Grund angeben.</p>
+    <textarea id="reject-reason" placeholder="Grund für die Ablehnung …"></textarea>
+    <div class="modal-actions">
+      <button type="button" class="btn-secondary" id="btn-reject-cancel">Abbrechen</button>
+      <button type="button" class="btn-primary" id="btn-reject-confirm" style="flex:1.2;margin-top:0">
+        <i class="fa-solid fa-xmark"></i> Ablehnen
+      </button>
+    </div>
+  </div>
+</div>
+
+<script>
+window.RootsUser = window.RootsUser || {
+  _p:null,_sb:null,_uid:null,
+  _initials(n){if(!n)return'?';return n.trim().split(/\s+/).map(w=>w[0]||'').join('').slice(0,2).toUpperCase();},
+  _avatarSpan(url,name,size){const ini=this._initials(name),s=`width:${size}px;height:${size}px;border-radius:50%;overflow:hidden;display:inline-flex;align-items:center;justify-content:center;font-weight:700;font-size:${Math.floor(size*.38)}px;`;if(url)return`<span style="${s}background:var(--brand-light)"><img src="${url}" style="width:100%;height:100%;object-fit:cover;border-radius:50%" onerror="this.parentElement.innerHTML='<span style=color:var(--brand)>${ini}</span>'"></span>`;return`<span style="${s}background:var(--brand-light);color:var(--brand)">${ini}</span>`;},
+  async _loadAndMount(sb){
+    this._sb=sb;const{data:{session}}=await sb.auth.getSession();
+    if(!session){this._uid=null;this._p=null;return;}
+    this._uid=session.user.id;this._p=null;
+    const{data}=await sb.schema('users').from('profiles').select('id,email,full_name,position,avatar_url,app_role').eq('id',this._uid).single();
+    this._p=data||{id:this._uid,email:session.user.email,app_role:'reader'};this._mount();
+  },
+  _mount(){
+    const p=this._p;const av=document.getElementById('user-avatar');const nm=document.getElementById('user-name-topbar');
+    if(av){av.innerHTML=this._avatarSpan(p.avatar_url,p.full_name,32);av.onclick=()=>{};}
+    if(nm)nm.textContent=p.full_name||p.email||'';
+  },
+  isAdmin(){return this._p?.app_role==='admin'},
+};
+</script>
+
+<script type="module">
+import { SB_URL, SB_ANON } from './config.js';
+import { initApp } from './app.js';
+
+const { createClient } = window.supabase;
+const sb = createClient(SB_URL, SB_ANON);
+const LOGIN_HTML = '<i class="fa-solid fa-arrow-right-to-bracket"></i> Anmelden';
+
+function resetLoginBtn() {
+  const btn = document.getElementById('btn-login');
+  if (btn) { btn.disabled = false; btn.innerHTML = LOGIN_HTML; }
+}
+
+function showLogin() {
+  document.getElementById('screen-dashboard').style.display = 'none';
+  document.getElementById('screen-login').style.display = 'flex';
+  document.body.classList.remove('body-dashboard');
+  resetLoginBtn();
+}
+
+async function onSession(session) {
+  if (!session) { showLogin(); if (window.RootsUser) { window.RootsUser._uid = null; window.RootsUser._p = null; } return; }
+  await window.RootsUser._loadAndMount(sb);
+  document.getElementById('screen-login').style.display = 'none';
+  document.dispatchEvent(new CustomEvent('roots-profile-ready'));
+  initApp(sb);
+}
+
+sb.auth.getSession().then(({ data: { session } }) => onSession(session));
+sb.auth.onAuthStateChange((event, session) => {
+  if (event === 'SIGNED_OUT') { showLogin(); return; }
+  if (session) onSession(session);
+});
+
+document.getElementById('form-login').addEventListener('submit', async (e) => {
+  e.preventDefault();
+  const btn = document.getElementById('btn-login');
+  const err = document.getElementById('login-error');
+  const errT = document.getElementById('login-error-text');
+  btn.disabled = true;
+  btn.innerHTML = '<i class="fa-solid fa-circle-notch roots-spin"></i> Anmelden…';
+  err.classList.remove('visible');
+  const { error } = await sb.auth.signInWithPassword({
+    email: document.getElementById('login-email').value.trim(),
+    password: document.getElementById('login-password').value,
+  });
+  if (error) {
+    errT.textContent = 'Ungültige E-Mail oder falsches Passwort.';
+    err.classList.add('visible');
+    resetLoginBtn();
+  }
+});
+</script>
+</body>
+</html>
