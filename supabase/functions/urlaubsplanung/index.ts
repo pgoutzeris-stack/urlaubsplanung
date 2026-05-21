@@ -109,6 +109,148 @@ function countDays(start: string, end: string): number {
   return Math.round((b.getTime() - a.getTime()) / 86400000) + 1;
 }
 
+function parseYmd(ymd: string): Date {
+  return new Date(`${ymd}T12:00:00`);
+}
+
+function formatDeYmd(ymd: string): string {
+  return parseYmd(ymd).toLocaleDateString("de-DE", {
+    day: "2-digit",
+    month: "2-digit",
+    year: "numeric",
+  });
+}
+
+function addDaysYmd(ymd: string, n: number): string {
+  const d = parseYmd(ymd);
+  d.setDate(d.getDate() + n);
+  return d.toISOString().slice(0, 10);
+}
+
+function isWeekendYmd(ymd: string): boolean {
+  const wd = parseYmd(ymd).getDay();
+  return wd === 0 || wd === 6;
+}
+
+function* eachDayYmd(start: string, end: string): Generator<string> {
+  let cur = start;
+  while (cur <= end) {
+    yield cur;
+    cur = addDaysYmd(cur, 1);
+  }
+}
+
+function rangesOverlap(
+  aStart: string,
+  aEnd: string,
+  bStart: string,
+  bEnd: string,
+): boolean {
+  return aStart <= bEnd && bStart <= aEnd;
+}
+
+async function loadHolidayMap(
+  kalender: ReturnType<typeof createClient>,
+  start: string,
+  end: string,
+): Promise<Map<string, string>> {
+  const { data, error } = await kalender
+    .from("nrw_holidays")
+    .select("holiday_date,label")
+    .gte("holiday_date", start)
+    .lte("holiday_date", end);
+  if (error) throw error;
+  const map = new Map<string, string>();
+  for (const h of data ?? []) {
+    map.set(String(h.holiday_date).slice(0, 10), String(h.label));
+  }
+  return map;
+}
+
+function countWorkingDaysInRange(
+  start: string,
+  end: string,
+  holidays: Map<string, string>,
+): number {
+  let n = 0;
+  for (const day of eachDayYmd(start, end)) {
+    if (isWeekendYmd(day)) continue;
+    if (holidays.has(day)) continue;
+    n++;
+  }
+  return n;
+}
+
+function validateNewVacationRange(
+  start: string,
+  end: string,
+  holidays: Map<string, string>,
+): { ok: true; days: number } | { ok: false; error: string } {
+  let days = 0;
+  for (const day of eachDayYmd(start, end)) {
+    if (isWeekendYmd(day)) {
+      const weekday = parseYmd(day).toLocaleDateString("de-DE", { weekday: "long" });
+      return {
+        ok: false,
+        error:
+          `Urlaub an Wochenenden ist nicht möglich (${formatDeYmd(day)}, ${weekday}). Bitte nur Werktage wählen.`,
+      };
+    }
+    const label = holidays.get(day);
+    if (label) {
+      return {
+        ok: false,
+        error:
+          `Am ${formatDeYmd(day)} (${label}) ist Feiertag – an diesem Tag kann kein Urlaub beantragt werden.`,
+      };
+    }
+    days++;
+  }
+  if (days === 0) {
+    return { ok: false, error: "Der gewählte Zeitraum enthält keine gültigen Urlaubstage." };
+  }
+  return { ok: true, days };
+}
+
+function findRequestConflict(
+  rows: Array<{ start_date: string; end_date: string; status: string }>,
+  start: string,
+  end: string,
+): string | null {
+  for (const row of rows) {
+    if (row.status !== "pending" && row.status !== "approved") continue;
+    if (!rangesOverlap(start, end, row.start_date, row.end_date)) continue;
+    const range = `${formatDeYmd(row.start_date)} – ${formatDeYmd(row.end_date)}`;
+    if (row.status === "pending") {
+      return `Für diesen Zeitraum liegt bereits ein ausstehender Antrag vor (${range}).`;
+    }
+    return `In diesem Zeitraum hast du bereits genehmigten Urlaub (${range}).`;
+  }
+  return null;
+}
+
+async function sumWorkingDaysForYear(
+  kalender: ReturnType<typeof createClient>,
+  rows: Array<{ start_date: string; end_date: string; status: string }>,
+  year: number,
+  statuses: Set<string>,
+): Promise<number> {
+  const yearStart = `${year}-01-01`;
+  const yearEnd = `${year}-12-31`;
+  const holidays = await loadHolidayMap(kalender, yearStart, yearEnd);
+  let total = 0;
+  for (const row of rows) {
+    if (!statuses.has(row.status)) continue;
+    const startYear = Number(row.start_date.slice(0, 4));
+    const endYear = Number(row.end_date.slice(0, 4));
+    if (startYear > year || endYear < year) continue;
+    const clipStart = row.start_date < yearStart ? yearStart : row.start_date;
+    const clipEnd = row.end_date > yearEnd ? yearEnd : row.end_date;
+    total += countWorkingDaysInRange(clipStart, clipEnd, holidays);
+  }
+  return total;
+}
+
 const DEFAULT_URLAUBSTAGE = 30;
 
 function getUrlaubstage(profile: { urlaubstage?: number | null } | null): number {
@@ -160,22 +302,6 @@ async function deductUrlaubstage(
     })
     .eq("id", userId);
   if (updErr) throw updErr;
-}
-
-function sumDaysForYear(
-  rows: Array<{ start_date: string; end_date: string; status: string }>,
-  year: number,
-  statuses: Set<string>,
-): number {
-  let total = 0;
-  for (const row of rows) {
-    if (!statuses.has(row.status)) continue;
-    const startYear = Number(row.start_date.slice(0, 4));
-    const endYear = Number(row.end_date.slice(0, 4));
-    if (startYear > year || endYear < year) continue;
-    total += countDays(row.start_date, row.end_date);
-  }
-  return total;
 }
 
 async function syncRootsClosures(
@@ -237,7 +363,21 @@ Deno.serve(async (req) => {
     }
 
     if (req.method === "GET") {
-      const scope = new URL(req.url).searchParams.get("scope") || "mine";
+      const params = new URL(req.url).searchParams;
+      const scope = params.get("scope") || "mine";
+      if (scope === "holidays") {
+        const year = Number(params.get("year") || yearNow);
+        const from = `${year}-01-01`;
+        const to = `${year}-12-31`;
+        const { data, error } = await kalender
+          .from("nrw_holidays")
+          .select("holiday_date,label")
+          .gte("holiday_date", from)
+          .lte("holiday_date", to)
+          .order("holiday_date");
+        if (error) throw error;
+        return json({ year, holidays: data ?? [] }, 200, c);
+      }
       if (scope === "balance") {
         const year = yearNow;
         const remaining = getUrlaubstage(profile);
@@ -251,7 +391,12 @@ Deno.serve(async (req) => {
           end_date: string;
           status: string;
         }>;
-        const pending = sumDaysForYear(rows, year, new Set(["pending"]));
+        const pending = await sumWorkingDaysForYear(
+          kalender,
+          rows,
+          year,
+          new Set(["pending"]),
+        );
         const { data: closureDays } = await kalender
           .from("roots_closure_days")
           .select("id")
@@ -311,33 +456,49 @@ Deno.serve(async (req) => {
         if (!start_date || !end_date || end_date < start_date) {
           return json({ error: "Ungültiger Zeitraum" }, 400, c);
         }
-        const requestedDays = countDays(start_date, end_date);
-        const year = Number(start_date.slice(0, 4));
-        const annual = getUrlaubstage(profile);
-        if (annual > 0) {
-          const { data: mine, error: mineErr } = await service
-            .from("urlaub_requests")
-            .select("start_date,end_date,status")
-            .eq("user_id", user.id);
-          if (mineErr) throw mineErr;
-          const rows = (mine ?? []) as Array<{
-            start_date: string;
-            end_date: string;
-            status: string;
-          }>;
-          const used = sumDaysForYear(rows, year, new Set(["approved"]));
-          const pending = sumDaysForYear(rows, year, new Set(["pending"]));
-          const remaining = annual - used - pending;
-          if (requestedDays > remaining) {
-            return json(
-              {
-                error: `Nicht genug Urlaubstage (${remaining} von ${annual} verfügbar)`,
-              },
-              400,
-              c,
-            );
-          }
+
+        const holidays = await loadHolidayMap(kalender, start_date, end_date);
+        const rangeCheck = validateNewVacationRange(start_date, end_date, holidays);
+        if (!rangeCheck.ok) {
+          return json({ error: rangeCheck.error }, 400, c);
         }
+        const requestedDays = rangeCheck.days;
+
+        const { data: mine, error: mineErr } = await service
+          .from("urlaub_requests")
+          .select("start_date,end_date,status")
+          .eq("user_id", user.id);
+        if (mineErr) throw mineErr;
+        const rows = (mine ?? []) as Array<{
+          start_date: string;
+          end_date: string;
+          status: string;
+        }>;
+
+        const conflict = findRequestConflict(rows, start_date, end_date);
+        if (conflict) {
+          return json({ error: conflict }, 409, c);
+        }
+
+        const year = Number(start_date.slice(0, 4));
+        const available = getUrlaubstage(profile);
+        const pendingDays = await sumWorkingDaysForYear(
+          kalender,
+          rows,
+          year,
+          new Set(["pending"]),
+        );
+        const remaining = available - pendingDays;
+        if (requestedDays > remaining) {
+          return json(
+            {
+              error: `Nicht genug Urlaubstage (${remaining} verfügbar, ${requestedDays} beantragt)`,
+            },
+            400,
+            c,
+          );
+        }
+
         const { data, error } = await service
           .from("urlaub_requests")
           .insert({
@@ -391,10 +552,18 @@ Deno.serve(async (req) => {
           return json(rowOut(data as Record<string, unknown>), 200, c);
         }
 
-        const approvedDays = countDays(
+        const approvedDays = countWorkingDaysInRange(
           reqRow.start_date as string,
           reqRow.end_date as string,
+          await loadHolidayMap(
+            kalender,
+            reqRow.start_date as string,
+            reqRow.end_date as string,
+          ),
         );
+        if (approvedDays < 1) {
+          return json({ error: "Antrag enthält keine gültigen Urlaubstage" }, 400, c);
+        }
         await deductUrlaubstage(service, reqRow.user_id as string, approvedDays);
 
         const member = await ensureTeamMember(

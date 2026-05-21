@@ -11,6 +11,8 @@ let isAdmin = false;
 let requests = [];
 let balance = null;
 let rejectTargetId = null;
+let holidaysByDate = new Map();
+let refreshTimer = null;
 
 const els = {};
 
@@ -39,10 +41,77 @@ function formatDeYmd(ymd) {
   return d.toLocaleDateString("de-DE", { day: "numeric", month: "short", year: "numeric" });
 }
 
-function countDays(start, end) {
-  const a = new Date(start + "T12:00:00");
-  const b = new Date(end + "T12:00:00");
-  return Math.round((b - a) / 86400000) + 1;
+function addDaysYmd(ymd, n) {
+  const d = new Date(ymd + "T12:00:00");
+  d.setDate(d.getDate() + n);
+  return d.toISOString().slice(0, 10);
+}
+
+function isWeekendYmd(ymd) {
+  const wd = new Date(ymd + "T12:00:00").getDay();
+  return wd === 0 || wd === 6;
+}
+
+function eachDayYmd(start, end) {
+  const days = [];
+  let cur = start;
+  while (cur <= end) {
+    days.push(cur);
+    cur = addDaysYmd(cur, 1);
+  }
+  return days;
+}
+
+function rangesOverlap(aStart, aEnd, bStart, bEnd) {
+  return aStart <= bEnd && bStart <= aEnd;
+}
+
+function countWorkingDays(start, end) {
+  let n = 0;
+  for (const day of eachDayYmd(start, end)) {
+    if (isWeekendYmd(day)) continue;
+    if (holidaysByDate.has(day)) continue;
+    n++;
+  }
+  return n;
+}
+
+function validateVacationRange(start, end) {
+  let days = 0;
+  for (const day of eachDayYmd(start, end)) {
+    if (isWeekendYmd(day)) {
+      const weekday = new Date(day + "T12:00:00").toLocaleDateString("de-DE", { weekday: "long" });
+      return {
+        ok: false,
+        error: `Urlaub an Wochenenden ist nicht möglich (${formatDeYmd(day)}, ${weekday}). Bitte nur Werktage wählen.`,
+      };
+    }
+    const label = holidaysByDate.get(day);
+    if (label) {
+      return {
+        ok: false,
+        error: `Am ${formatDeYmd(day)} (${label}) ist Feiertag – an diesem Tag kann kein Urlaub beantragt werden.`,
+      };
+    }
+    days++;
+  }
+  if (days === 0) {
+    return { ok: false, error: "Der gewählte Zeitraum enthält keine gültigen Urlaubstage." };
+  }
+  return { ok: true, days };
+}
+
+function findLocalConflict(start, end) {
+  for (const row of requests) {
+    if (row.status !== "pending" && row.status !== "approved") continue;
+    if (!rangesOverlap(start, end, row.start_date, row.end_date)) continue;
+    const range = `${formatDeYmd(row.start_date)} – ${formatDeYmd(row.end_date)}`;
+    if (row.status === "pending") {
+      return `Für diesen Zeitraum liegt bereits ein ausstehender Antrag vor (${range}).`;
+    }
+    return `In diesem Zeitraum hast du bereits genehmigten Urlaub (${range}).`;
+  }
+  return null;
 }
 
 async function api(method, body, query = "") {
@@ -94,6 +163,18 @@ function waitForProfile(ms = 20000) {
   });
 }
 
+async function loadHolidays(year = new Date().getFullYear()) {
+  try {
+    const data = await api("GET", null, `?scope=holidays&year=${year}`);
+    holidaysByDate = new Map(
+      (data?.holidays || []).map((h) => [String(h.holiday_date).slice(0, 10), h.label]),
+    );
+  } catch (e) {
+    console.warn("Feiertage konnten nicht geladen werden", e);
+    holidaysByDate = new Map();
+  }
+}
+
 async function refreshRole() {
   const ru = await waitForProfile();
   if (!ru) throw new Error("Profil nicht geladen");
@@ -105,7 +186,7 @@ async function refreshRole() {
   if (els.greetingDesc) {
     els.greetingDesc.textContent = isAdmin
       ? "Prüfe offene Urlaubsanträge. Bei Genehmigung wird der Urlaub automatisch im Team-Kalender eingetragen."
-      : "Reiche hier deinen Urlaub ein. Nach der Freigabe durch einen Admin wird er automatisch im Team-Kalender eingetragen.";
+      : "Reiche hier deinen Urlaub ein. Nach der Freigabe durch einen Admin wird er automatisch im Team-Kalender eingetragen. Wochenenden und Feiertage sind nicht möglich.";
   }
 }
 
@@ -120,6 +201,37 @@ async function loadRequests() {
   requests = (await api("GET", null, `?scope=${scope}`)) || [];
   renderLists();
   updateStats();
+}
+
+async function refreshData() {
+  if (!sb || !isProfileReady()) return;
+  try {
+    if (!isAdmin) await loadBalance();
+    await loadRequests();
+  } catch (e) {
+    console.warn("Hintergrund-Aktualisierung fehlgeschlagen", e);
+  }
+}
+
+function startAutoRefresh() {
+  stopAutoRefresh();
+  refreshTimer = setInterval(() => {
+    if (els.dashboard?.style.display === "none") return;
+    void refreshData();
+  }, 45000);
+  window.addEventListener("focus", onWindowFocus);
+}
+
+function stopAutoRefresh() {
+  if (refreshTimer) {
+    clearInterval(refreshTimer);
+    refreshTimer = null;
+  }
+  window.removeEventListener("focus", onWindowFocus);
+}
+
+function onWindowFocus() {
+  void refreshData();
 }
 
 function updateStats() {
@@ -140,7 +252,8 @@ function updateStats() {
 
 function renderRequestCard(r, { showActions = false } = {}) {
   const st = STATUS[r.status] || STATUS.pending;
-  const days = countDays(r.start_date, r.end_date);
+  const days = countWorkingDays(r.start_date, r.end_date);
+  const dayLabel = days === 1 ? "Urlaubstag" : "Urlaubstage";
   const actions =
     showActions && r.status === "pending"
       ? `<div class="req-actions">
@@ -161,7 +274,7 @@ function renderRequestCard(r, { showActions = false } = {}) {
     <div class="req-card-top">
       <div>
         <h3 class="req-name">${escapeHtml(r.applicant_name)}</h3>
-        <p class="req-range">${formatDeYmd(r.start_date)} – ${formatDeYmd(r.end_date)} · ${days} ${days === 1 ? "Tag" : "Tage"}</p>
+        <p class="req-range">${formatDeYmd(r.start_date)} – ${formatDeYmd(r.end_date)} · ${days} ${dayLabel}</p>
       </div>
       <span class="status-pill ${st.cls}"><i class="fa-solid ${st.icon}"></i> ${st.label}</span>
     </div>
@@ -205,7 +318,7 @@ async function handleApprove(id) {
   try {
     await api("POST", { action: "approve", id });
     toast("Urlaub genehmigt und im Team-Kalender eingetragen", "ok");
-    await loadRequests();
+    await refreshData();
   } catch (e) {
     toast(e.message || "Genehmigung fehlgeschlagen", "err");
   }
@@ -234,7 +347,7 @@ async function handleReject() {
     });
     toast("Antrag abgelehnt", "info");
     closeRejectModal();
-    await loadRequests();
+    await refreshData();
   } catch (e) {
     toast(e.message || "Ablehnung fehlgeschlagen", "err");
   }
@@ -249,6 +362,26 @@ async function handleSubmit(e) {
     toast("Bitte einen gültigen Zeitraum wählen", "err");
     return;
   }
+
+  const year = Number(start.slice(0, 4));
+  if (!holidaysByDate.size || ![...holidaysByDate.keys()].some((d) => d.startsWith(String(year)))) {
+    await loadHolidays(year);
+  }
+
+  const rangeCheck = validateVacationRange(start, end);
+  if (!rangeCheck.ok) {
+    toast(rangeCheck.error, "err");
+    return;
+  }
+
+  if (!isAdmin) {
+    const conflict = findLocalConflict(start, end);
+    if (conflict) {
+      toast(conflict, "err");
+      return;
+    }
+  }
+
   const btn = els.btnSubmit;
   btn.disabled = true;
   try {
@@ -258,10 +391,10 @@ async function handleSubmit(e) {
     const today = new Date().toISOString().slice(0, 10);
     els.fStart.value = today;
     els.fEnd.value = today;
-    if (!isAdmin) await loadBalance();
-    await loadRequests();
+    await refreshData();
   } catch (err) {
     toast(err.message || "Einreichung fehlgeschlagen", "err");
+    await refreshData();
   } finally {
     btn.disabled = false;
   }
@@ -273,9 +406,11 @@ function showDashboard() {
   document.body.classList.add("body-dashboard");
   const name = window.RootsUser?._p?.full_name?.split(" ")[0] || "du";
   els.greeting.textContent = `Hallo, ${name}!`;
+  startAutoRefresh();
 }
 
 function showLogin() {
+  stopAutoRefresh();
   els.dashboard.style.display = "none";
   document.getElementById("screen-login").style.display = "flex";
   document.body.classList.remove("body-dashboard");
@@ -284,6 +419,7 @@ function showLogin() {
 async function bootApp() {
   try {
     await refreshRole();
+    await loadHolidays(new Date().getFullYear());
     if (!isAdmin) await loadBalance();
     await loadRequests();
     showDashboard();
