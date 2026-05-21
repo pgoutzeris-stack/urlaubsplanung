@@ -190,11 +190,11 @@
     }
     .closure-list { display: flex; flex-direction: column; gap: .65rem; }
     .closure-row {
-      display: grid; grid-template-columns: 11rem minmax(18rem, 1fr) 9rem 8rem; gap: 1rem; align-items: center;
+      display: grid; grid-template-columns: 9.5rem minmax(12rem, 1fr) 7.5rem 7rem; gap: .85rem; align-items: center;
       border: 1px solid var(--line); border-radius: 12px; padding: .85rem 1rem; background: var(--status-bg);
     }
     #admin-settings-modal .settings-table-head.closure-head {
-      grid-template-columns: 11rem minmax(18rem, 1fr) 9rem 8rem;
+      grid-template-columns: 9.5rem minmax(12rem, 1fr) 7.5rem 7rem;
     }
     @media (max-width: 900px) {
       .closure-row { grid-template-columns: 1fr 1fr; }
@@ -249,7 +249,7 @@
       display: grid; gap: 1rem; padding: 0 1rem .45rem;
       font-size: .72rem; font-weight: 700; color: var(--muted); text-transform: uppercase; letter-spacing: .04em;
     }
-    .settings-table-head.closure-head { grid-template-columns: 11rem minmax(18rem, 1fr) 9rem 8rem; }
+    .settings-table-head.closure-head { grid-template-columns: 9.5rem minmax(12rem, 1fr) 7.5rem 7rem; }
     @media (max-width: 900px) { .settings-table-head { display: none; } }
 
     .settings-tab-panel[hidden] { display: none !important; }
@@ -277,8 +277,8 @@
     .modal-box h2 { font-size: 1.15rem; margin-bottom: .5rem; }
     .modal-box p { color: var(--muted); font-size: .9rem; margin-bottom: 1rem; }
     .modal-box.modal-box--wide {
-      max-width: min(1200px, calc(100vw - 2rem));
-      width: min(1200px, calc(100vw - 2rem));
+      max-width: min(920px, calc(100vw - 2rem));
+      width: min(920px, calc(100vw - 2rem));
       padding: 0;
       overflow: hidden;
     }
