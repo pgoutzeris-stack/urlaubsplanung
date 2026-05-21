@@ -92,6 +92,12 @@
     .header-divider { width: 1px; height: 16px; background: var(--line); }
     .header-sub { font-size: 12px; color: var(--muted); }
     .header-right { display: flex; align-items: center; gap: 8px; }
+    .btn-header-gear {
+      width: 36px; height: 36px; border-radius: 10px; border: 1px solid var(--line);
+      background: var(--bg); color: var(--muted); cursor: pointer; display: inline-flex;
+      align-items: center; justify-content: center; font-size: .95rem; transition: all .2s;
+    }
+    .btn-header-gear:hover { border-color: var(--brand); color: var(--brand); background: var(--brand-light); }
     .dash-avatar { width: 32px; height: 32px; border-radius: 50%; background: var(--brand-light); color: var(--brand); display: flex; align-items: center; justify-content: center; font-weight: 700; font-size: .8rem; }
     .role-badge {
       font-size: .72rem; font-weight: 700; text-transform: uppercase; letter-spacing: .05em;
@@ -115,7 +121,8 @@
 
     .layout-grid { display: grid; grid-template-columns: 1fr 1.1fr; gap: 1.25rem; align-items: stretch; }
     .layout-grid .panel { display: flex; flex-direction: column; }
-    @media (max-width: 900px) { .layout-grid { grid-template-columns: 1fr; } }
+    .admin-layout-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 1.25rem; margin-bottom: 1.5rem; align-items: start; }
+    @media (max-width: 900px) { .layout-grid, .admin-layout-grid { grid-template-columns: 1fr; } }
 
     .panel {
       background: var(--bg); border-radius: var(--radius-dash); padding: 1.35rem 1.5rem;
@@ -187,6 +194,57 @@
       font-family: inherit; font-size: .82rem; font-weight: 600; cursor: pointer; white-space: nowrap;
     }
     .btn-closure-save:disabled { opacity: .55; cursor: not-allowed; }
+
+    .team-overview-list { display: flex; flex-direction: column; gap: .65rem; max-height: 520px; overflow-y: auto; }
+    .team-row {
+      border: 1px solid var(--line); border-radius: 12px; padding: .85rem .95rem; background: var(--status-bg);
+    }
+    .team-row-head { display: flex; justify-content: space-between; align-items: flex-start; gap: .75rem; margin-bottom: .45rem; }
+    .team-row-name { display: flex; align-items: center; gap: .55rem; min-width: 0; }
+    .team-kuerzel {
+      display: inline-flex; align-items: center; justify-content: center; min-width: 2rem; height: 1.5rem;
+      padding: 0 .45rem; border-radius: 999px; background: var(--brand-light); color: var(--brand);
+      font-size: .72rem; font-weight: 800; letter-spacing: .03em;
+    }
+    .team-row-title { font-size: .92rem; font-weight: 700; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .team-row-main { font-size: .88rem; font-weight: 700; color: var(--brand); white-space: nowrap; }
+    .team-row-sub { font-size: .78rem; color: var(--muted); margin-top: .2rem; }
+    .team-progress { height: 6px; border-radius: 999px; background: var(--line); overflow: hidden; margin-top: .55rem; }
+    .team-progress > span { display: block; height: 100%; border-radius: 999px; background: linear-gradient(90deg, var(--brand), #60a5fa); }
+
+    .staff-settings-list { display: flex; flex-direction: column; gap: .65rem; max-height: 340px; overflow-y: auto; }
+    .staff-row {
+      display: grid; grid-template-columns: 1fr 5.5rem auto; gap: .65rem; align-items: center;
+      border: 1px solid var(--line); border-radius: 12px; padding: .75rem .85rem; background: var(--status-bg);
+    }
+    @media (max-width: 640px) { .staff-row { grid-template-columns: 1fr; } }
+    .staff-row-name { font-size: .9rem; font-weight: 700; }
+    .staff-row-meta { font-size: .75rem; color: var(--muted); margin-top: .1rem; }
+    .staff-row input[type="number"] {
+      width: 100%; height: 38px; padding: 0 .65rem; border: 1px solid var(--line); border-radius: 10px;
+      font-family: inherit; font-size: .88rem; background: var(--bg);
+    }
+
+    .settings-tabs { display: flex; gap: .5rem; margin-bottom: 1rem; flex-wrap: wrap; }
+    .settings-tab {
+      height: 36px; padding: 0 1rem; border: 1px solid var(--line); border-radius: 999px;
+      background: var(--bg); color: var(--muted); font-family: inherit; font-size: .85rem; font-weight: 600; cursor: pointer;
+    }
+    .settings-tab.is-active { border-color: var(--brand); color: var(--brand); background: var(--brand-light); }
+    .settings-tab-panel[hidden] { display: none !important; }
+    .modal-box--wide { max-width: 720px; padding: 0; overflow: hidden; }
+    .modal-box--wide .modal-box-head {
+      display: flex; align-items: center; justify-content: space-between; gap: 1rem;
+      padding: 1.25rem 1.5rem; border-bottom: 1px solid var(--line);
+    }
+    .modal-box--wide .modal-box-head h2 { margin: 0; font-size: 1.15rem; }
+    .modal-box--wide .modal-box-body { padding: 1.25rem 1.5rem 1.5rem; max-height: min(72vh, 680px); overflow-y: auto; }
+    .modal-close-btn {
+      width: 36px; height: 36px; border: none; border-radius: 50%; background: var(--status-bg);
+      color: var(--muted); cursor: pointer; font-size: 1rem;
+    }
+    .modal-close-btn:hover { background: var(--line); color: var(--ink); }
+
     .empty-state { text-align: center; padding: 2rem 1rem; color: var(--muted); }
     .empty-state i { font-size: 2rem; opacity: .35; margin-bottom: .75rem; display: block; }
 
@@ -340,6 +398,9 @@
       <span class="header-sub">Urlaub einreichen &amp; freigeben</span>
     </div>
     <div class="header-right">
+      <button type="button" class="btn-header-gear" id="btn-admin-settings" hidden title="Admin-Einstellungen" aria-label="Admin-Einstellungen">
+        <i class="fa-solid fa-gear"></i>
+      </button>
       <div class="dash-avatar" id="user-avatar" style="cursor:pointer" title="Profil"></div>
       <span id="user-name-topbar" class="header-sub"></span>
     </div>
@@ -397,28 +458,58 @@
           <div class="stat-label">Offene Anträge</div>
           <div class="stat-value" id="admin-pending-count">0</div>
         </div>
+        <div class="stat-card">
+          <div class="stat-label">Team-Mitglieder</div>
+          <div class="stat-value" id="admin-team-count">0</div>
+        </div>
       </div>
-      <p style="color:var(--muted);margin-bottom:1.25rem;font-size:.95rem;">
-        Genehmigte Urlaube werden automatisch als Eintrag im Team-Kalender angelegt.
-      </p>
-      <div class="admin-section">
-        <h3>Zur Freigabe</h3>
-        <div class="req-list" id="admin-pending-list"></div>
+      <div class="admin-layout-grid">
+        <section class="panel">
+          <h2 class="panel-title"><i class="fa-solid fa-users"></i> Team-Übersicht <span id="team-overview-year-label" style="font-size:.85rem;color:var(--muted);font-weight:600"></span></h2>
+          <div class="team-overview-list" id="admin-team-overview"></div>
+        </section>
+        <section class="panel">
+          <h2 class="panel-title"><i class="fa-solid fa-inbox"></i> Zur Freigabe</h2>
+          <p style="color:var(--muted);margin:-.35rem 0 1rem;font-size:.9rem;line-height:1.45;">
+            Genehmigte Urlaube werden automatisch im Team-Kalender eingetragen.
+          </p>
+          <div class="req-list" id="admin-pending-list"></div>
+        </section>
       </div>
       <div class="admin-section">
         <h3>Bearbeitet</h3>
         <div class="req-list" id="admin-history-list"></div>
       </div>
-      <div class="admin-section">
-        <h3>Betriebsferien &amp; ROOTS-Tage</h3>
+    </div>
+  </div>
+</div>
+
+<div class="modal-overlay" id="admin-settings-modal" aria-hidden="true">
+  <div class="modal-box modal-box--wide" role="dialog" aria-labelledby="admin-settings-title">
+    <div class="modal-box-head">
+      <h2 id="admin-settings-title"><i class="fa-solid fa-gear" style="color:var(--brand);margin-right:.45rem"></i> Admin-Einstellungen</h2>
+      <button type="button" class="modal-close-btn" id="btn-admin-settings-close" aria-label="Schließen"><i class="fa-solid fa-xmark"></i></button>
+    </div>
+    <div class="modal-box-body">
+      <div class="settings-tabs" role="tablist">
+        <button type="button" class="settings-tab is-active" data-settings-tab="staff" role="tab" aria-selected="true">Urlaubstage</button>
+        <button type="button" class="settings-tab" data-settings-tab="closures" role="tab" aria-selected="false">Betriebsferien &amp; ROOTS-Tage</button>
+      </div>
+      <div class="settings-tab-panel" id="settings-tab-staff" role="tabpanel">
+        <p style="color:var(--muted);margin-bottom:1rem;font-size:.9rem;line-height:1.45;">
+          Lege die verfügbaren Urlaubstage pro Mitarbeiter fest. Genehmigte und offene Anträge ziehen davon automatisch ab.
+        </p>
+        <div class="staff-settings-list" id="admin-staff-list"></div>
+      </div>
+      <div class="settings-tab-panel" id="settings-tab-closures" role="tabpanel" hidden>
         <p style="color:var(--muted);margin-bottom:.85rem;font-size:.9rem;line-height:1.45;">
-          Verpflichtende freie Tage und Betriebsferien werden automatisch im Team-Kalender eingetragen und können dort nicht bearbeitet werden.
+          Verpflichtende freie Tage und Betriebsferien werden automatisch im Team-Kalender eingetragen.
         </p>
         <div class="closure-toolbar">
-          <label for="closure-year">Jahr</label>
-          <select id="closure-year"></select>
+          <label for="settings-closure-year">Jahr</label>
+          <select id="settings-closure-year"></select>
         </div>
-        <div class="closure-list" id="admin-closures-list"></div>
+        <div class="closure-list" id="admin-settings-closures-list"></div>
       </div>
     </div>
   </div>

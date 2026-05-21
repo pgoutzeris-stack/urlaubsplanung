@@ -17,6 +17,10 @@ let holidaysByDate = new Map();
 let refreshTimer = null;
 let closures = [];
 let closureYear = new Date().getFullYear();
+let teamOverview = [];
+let teamOverviewYear = new Date().getFullYear();
+let staffSettings = [];
+let settingsTab = "staff";
 
 const els = {};
 
@@ -185,11 +189,12 @@ async function refreshRole() {
   isAdmin = Boolean(window.RootsUser?.isAdmin?.());
   els.adminPanel.hidden = !isAdmin;
   els.userPanel.hidden = isAdmin;
+  if (els.btnAdminSettings) els.btnAdminSettings.hidden = !isAdmin;
   if (els.userBadge) els.userBadge.hidden = isAdmin;
   if (els.adminBadge) els.adminBadge.hidden = !isAdmin;
   if (els.greetingDesc) {
     els.greetingDesc.textContent = isAdmin
-      ? "Prüfe offene Urlaubsanträge. Bei Genehmigung wird der Urlaub automatisch im Team-Kalender eingetragen."
+      ? "Prüfe offene Urlaubsanträge und behalte Urlaubskontingente im Blick. Einstellungen findest du über das Zahnrad oben rechts."
       : "Reiche hier deinen Urlaub ein. Nach der Freigabe durch einen Admin wird er automatisch im Team-Kalender eingetragen. Wochenenden und Feiertage sind nicht möglich.";
   }
 }
@@ -205,7 +210,133 @@ async function loadRequests() {
   requests = (await api("GET", null, `?scope=${scope}`)) || [];
   renderLists();
   updateStats();
-  if (isAdmin) await loadClosures(closureYear);
+  if (isAdmin) await loadTeamOverview(teamOverviewYear);
+}
+
+async function loadTeamOverview(year) {
+  if (!isAdmin) return;
+  teamOverviewYear = year;
+  const data = await api("GET", null, `?scope=team_overview&year=${year}`);
+  teamOverview = data?.team || [];
+  renderTeamOverview();
+}
+
+function renderTeamOverview() {
+  if (!els.adminTeamOverview) return;
+  if (els.teamOverviewYearLabel) {
+    els.teamOverviewYearLabel.textContent = `(${teamOverviewYear})`;
+  }
+  if (els.adminTeamCount) {
+    els.adminTeamCount.textContent = String(teamOverview.length);
+  }
+  if (!teamOverview.length) {
+    els.adminTeamOverview.innerHTML =
+      '<div class="empty-state"><i class="fa-solid fa-users"></i><p>Keine Team-Daten verfügbar.</p></div>';
+    return;
+  }
+  els.adminTeamOverview.innerHTML = teamOverview
+    .map((row) => {
+      const kz = escapeHtml((row.kuerzel || row.full_name || "?").slice(0, 4).toUpperCase());
+      const total = Math.max(row.total_allowance || 0, 1);
+      const pct = Math.min(100, Math.round(((row.planned_days || 0) / total) * 100));
+      const pendingHint =
+        row.pending_count > 0
+          ? `${row.pending_count} offene${row.pending_count === 1 ? "r" : ""} Antrag${row.pending_count === 1 ? "" : "e"}`
+          : "Keine offenen Anträge";
+      return `<article class="team-row">
+        <div class="team-row-head">
+          <div class="team-row-name">
+            <span class="team-kuerzel">${kz}</span>
+            <span class="team-row-title">${escapeHtml(row.full_name)}</span>
+          </div>
+          <span class="team-row-main">${row.planned_days || 0} / ${total} Tage</span>
+        </div>
+        <div class="team-row-sub">${row.remaining ?? 0} verbleibend · ${pendingHint}</div>
+        <div class="team-progress" aria-hidden="true"><span style="width:${pct}%"></span></div>
+      </article>`;
+    })
+    .join("");
+}
+
+async function loadStaffSettings() {
+  if (!isAdmin) return;
+  const data = await api("GET", null, "?scope=staff");
+  staffSettings = data?.staff || [];
+  renderStaffSettings();
+}
+
+function renderStaffSettings() {
+  if (!els.adminStaffList) return;
+  if (!staffSettings.length) {
+    els.adminStaffList.innerHTML =
+      '<div class="empty-state"><i class="fa-solid fa-user"></i><p>Keine Mitarbeiter gefunden.</p></div>';
+    return;
+  }
+  els.adminStaffList.innerHTML = staffSettings
+    .map(
+      (row) => `<div class="staff-row" data-staff-id="${row.user_id}">
+        <div>
+          <div class="staff-row-name">${escapeHtml(row.full_name)}</div>
+          <div class="staff-row-meta">${escapeHtml(row.kuerzel || "—")}</div>
+        </div>
+        <input type="number" min="0" max="365" step="1" data-field="urlaubstage" value="${Number(row.urlaubstage || 0)}" aria-label="Urlaubstage für ${escapeHtml(row.full_name)}" />
+        <button type="button" class="btn-closure-save" data-save-staff="${row.user_id}">Speichern</button>
+      </div>`,
+    )
+    .join("");
+  els.adminStaffList.querySelectorAll("[data-save-staff]").forEach((btn) => {
+    btn.addEventListener("click", () => void saveStaffUrlaubstage(btn.dataset.saveStaff));
+  });
+}
+
+async function saveStaffUrlaubstage(userId) {
+  const rowEl = els.adminStaffList?.querySelector(`[data-staff-id="${userId}"]`);
+  if (!rowEl) return;
+  const urlaubstage = rowEl.querySelector('[data-field="urlaubstage"]')?.value;
+  const btn = rowEl.querySelector("[data-save-staff]");
+  if (btn) {
+    btn.disabled = true;
+    btn.textContent = "Speichern…";
+  }
+  try {
+    await api("POST", { action: "update_urlaubstage", user_id: userId, urlaubstage });
+    toast("Urlaubstage gespeichert", "ok");
+    await loadStaffSettings();
+    await loadTeamOverview(teamOverviewYear);
+  } catch (e) {
+    toast(e.message || "Speichern fehlgeschlagen", "err");
+  } finally {
+    if (btn) {
+      btn.disabled = false;
+      btn.textContent = "Speichern";
+    }
+  }
+}
+
+async function openAdminSettingsModal() {
+  if (!isAdmin || !els.adminSettingsModal) return;
+  settingsTab = "staff";
+  setSettingsTab("staff");
+  els.adminSettingsModal.classList.add("is-open");
+  els.adminSettingsModal.setAttribute("aria-hidden", "false");
+  await Promise.all([loadStaffSettings(), loadClosures(closureYear)]);
+}
+
+function closeAdminSettingsModal() {
+  if (!els.adminSettingsModal) return;
+  els.adminSettingsModal.classList.remove("is-open");
+  els.adminSettingsModal.setAttribute("aria-hidden", "true");
+}
+
+function setSettingsTab(tab) {
+  settingsTab = tab;
+  els.settingsTabs?.forEach((btn) => {
+    const on = btn.dataset.settingsTab === tab;
+    btn.classList.toggle("is-active", on);
+    btn.setAttribute("aria-selected", on ? "true" : "false");
+  });
+  if (els.settingsTabStaff) els.settingsTabStaff.hidden = tab !== "staff";
+  if (els.settingsTabClosures) els.settingsTabClosures.hidden = tab !== "closures";
 }
 
 async function loadClosures(year) {
@@ -217,23 +348,25 @@ async function loadClosures(year) {
 }
 
 function renderClosuresAdmin() {
-  if (!els.adminClosuresList || !els.closureYear) return;
+  const listEl = els.settingsClosuresList;
+  const yearEl = els.settingsClosureYear;
+  if (!listEl || !yearEl) return;
   const yNow = new Date().getFullYear();
-  if (!els.closureYear.options.length) {
+  if (!yearEl.options.length) {
     for (let y = yNow - 1; y <= yNow + 3; y++) {
       const o = document.createElement("option");
       o.value = String(y);
       o.textContent = String(y);
-      els.closureYear.appendChild(o);
+      yearEl.appendChild(o);
     }
   }
-  els.closureYear.value = String(closureYear);
+  yearEl.value = String(closureYear);
   if (!closures.length) {
-    els.adminClosuresList.innerHTML =
+    listEl.innerHTML =
       '<div class="empty-state"><i class="fa-regular fa-calendar"></i>Keine ROOTS-Tage für dieses Jahr hinterlegt.</div>';
     return;
   }
-  els.adminClosuresList.innerHTML = closures
+  listEl.innerHTML = closures
     .map(
       (row) => `<div class="closure-row" data-closure-id="${row.id}">
       <div>
@@ -246,13 +379,13 @@ function renderClosuresAdmin() {
     </div>`,
     )
     .join("");
-  els.adminClosuresList.querySelectorAll("[data-save-closure]").forEach((btn) => {
+  listEl.querySelectorAll("[data-save-closure]").forEach((btn) => {
     btn.addEventListener("click", () => void saveClosureRow(btn.dataset.saveClosure));
   });
 }
 
 async function saveClosureRow(id) {
-  const rowEl = els.adminClosuresList?.querySelector(`[data-closure-id="${id}"]`);
+  const rowEl = els.settingsClosuresList?.querySelector(`[data-closure-id="${id}"]`);
   if (!rowEl) return;
   const label = rowEl.querySelector('[data-field="label"]')?.value?.trim();
   const deduct_days = rowEl.querySelector('[data-field="deduct_days"]')?.value;
@@ -280,6 +413,9 @@ async function refreshData() {
   try {
     if (!isAdmin) await loadBalance();
     await loadRequests();
+    if (isAdmin && els.adminSettingsModal?.classList.contains("is-open")) {
+      await Promise.all([loadStaffSettings(), loadClosures(closureYear)]);
+    }
   } catch (e) {
     console.warn("Hintergrund-Aktualisierung fehlgeschlagen", e);
   }
@@ -558,6 +694,27 @@ function bindUi() {
       void loadClosures(Number(els.closureYear.value) || new Date().getFullYear());
     });
   }
+  if (els.btnAdminSettings) {
+    els.btnAdminSettings.addEventListener("click", () => void openAdminSettingsModal());
+  }
+  if (els.btnAdminSettingsClose) {
+    els.btnAdminSettingsClose.addEventListener("click", closeAdminSettingsModal);
+  }
+  if (els.adminSettingsModal) {
+    els.adminSettingsModal.addEventListener("click", (e) => {
+      if (e.target === els.adminSettingsModal) closeAdminSettingsModal();
+    });
+  }
+  if (els.settingsTabs) {
+    els.settingsTabs.forEach((btn) => {
+      btn.addEventListener("click", () => setSettingsTab(btn.dataset.settingsTab || "staff"));
+    });
+  }
+  if (els.settingsClosureYear) {
+    els.settingsClosureYear.addEventListener("change", () => {
+      void loadClosures(Number(els.settingsClosureYear.value) || new Date().getFullYear());
+    });
+  }
 
   document.addEventListener("roots-profile-ready", () => void bootApp());
 }
@@ -583,7 +740,18 @@ function cacheEls() {
   els.adminPendingCount = document.getElementById("admin-pending-count");
   els.adminPendingList = document.getElementById("admin-pending-list");
   els.adminHistoryList = document.getElementById("admin-history-list");
-  els.adminClosuresList = document.getElementById("admin-closures-list");
+  els.adminTeamOverview = document.getElementById("admin-team-overview");
+  els.adminTeamCount = document.getElementById("admin-team-count");
+  els.teamOverviewYearLabel = document.getElementById("team-overview-year-label");
+  els.btnAdminSettings = document.getElementById("btn-admin-settings");
+  els.adminSettingsModal = document.getElementById("admin-settings-modal");
+  els.btnAdminSettingsClose = document.getElementById("btn-admin-settings-close");
+  els.settingsTabs = document.querySelectorAll("[data-settings-tab]");
+  els.settingsTabStaff = document.getElementById("settings-tab-staff");
+  els.settingsTabClosures = document.getElementById("settings-tab-closures");
+  els.adminStaffList = document.getElementById("admin-staff-list");
+  els.settingsClosuresList = document.getElementById("admin-settings-closures-list");
+  els.settingsClosureYear = document.getElementById("settings-closure-year");
   els.closureYear = document.getElementById("closure-year");
   els.rejectModal = document.getElementById("reject-modal");
   els.rejectReason = document.getElementById("reject-reason");

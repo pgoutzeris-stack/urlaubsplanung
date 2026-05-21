@@ -333,6 +333,110 @@ async function refundUrlaubstage(
   if (updErr) throw updErr;
 }
 
+async function loadClosureRequestIds(
+  service: ReturnType<typeof createClient>,
+): Promise<Set<string>> {
+  const { data, error } = await service
+    .from("roots_closure_assignments")
+    .select("urlaub_request_id");
+  if (error) throw error;
+  return new Set(
+    (data ?? [])
+      .map((r) => r.urlaub_request_id as string | null)
+      .filter((id): id is string => Boolean(id)),
+  );
+}
+
+async function buildTeamOverview(
+  service: ReturnType<typeof createClient>,
+  kalender: ReturnType<typeof createClient>,
+  year: number,
+) {
+  const yearStart = `${year}-01-01`;
+  const yearEnd = `${year}-12-31`;
+  const holidays = await loadHolidayMap(kalender, yearStart, yearEnd);
+  const closureReqIds = await loadClosureRequestIds(service);
+
+  const { data: profiles, error: profErr } = await service
+    .schema("users")
+    .from("profiles")
+    .select("id,full_name,email,kuerzel,urlaubstage")
+    .order("full_name");
+  if (profErr) throw profErr;
+
+  const { data: allRequests, error: reqErr } = await service
+    .from("urlaub_requests")
+    .select("id,user_id,start_date,end_date,status");
+  if (reqErr) throw reqErr;
+
+  const rows = (profiles ?? [])
+    .filter((p) => {
+      const email = String(p.email || "").toLowerCase();
+      return email && !email.endsWith("@test.de");
+    })
+    .map((p) => {
+      const userId = String(p.id);
+      let approvedDays = 0;
+      let pendingDays = 0;
+      let pendingCount = 0;
+
+      for (const req of allRequests ?? []) {
+        if (req.user_id !== userId) continue;
+        if (closureReqIds.has(String(req.id))) continue;
+        if (req.status !== "pending" && req.status !== "approved") continue;
+        const startYear = Number(String(req.start_date).slice(0, 4));
+        const endYear = Number(String(req.end_date).slice(0, 4));
+        if (startYear > year || endYear < year) continue;
+        const clipStart = String(req.start_date) < yearStart ? yearStart : String(req.start_date);
+        const clipEnd = String(req.end_date) > yearEnd ? yearEnd : String(req.end_date);
+        const days = countWorkingDaysInRange(clipStart, clipEnd, holidays);
+        if (req.status === "pending") {
+          pendingDays += days;
+          pendingCount += 1;
+        } else {
+          approvedDays += days;
+        }
+      }
+
+      const allowance = getUrlaubstage(p);
+      const plannedDays = approvedDays + pendingDays;
+      return {
+        user_id: userId,
+        full_name: p.full_name || p.email || "—",
+        kuerzel: p.kuerzel || null,
+        remaining: Math.max(0, allowance - plannedDays),
+        approved_days: approvedDays,
+        pending_days: pendingDays,
+        planned_days: plannedDays,
+        pending_count: pendingCount,
+        total_allowance: allowance,
+      };
+    });
+
+  return { year, team: rows };
+}
+
+async function loadStaffSettings(service: ReturnType<typeof createClient>) {
+  const { data, error } = await service
+    .schema("users")
+    .from("profiles")
+    .select("id,full_name,email,kuerzel,urlaubstage")
+    .order("full_name");
+  if (error) throw error;
+  const staff = (data ?? [])
+    .filter((p) => {
+      const email = String(p.email || "").toLowerCase();
+      return email && !email.endsWith("@test.de");
+    })
+    .map((p) => ({
+      user_id: p.id,
+      full_name: p.full_name || p.email || "—",
+      kuerzel: p.kuerzel || null,
+      urlaubstage: getUrlaubstage(p),
+    }));
+  return { staff };
+}
+
 async function sumWorkingDaysForYear(
   kalender: ReturnType<typeof createClient>,
   rows: Array<{ start_date: string; end_date: string; status: string }>,
@@ -549,6 +653,15 @@ Deno.serve(async (req) => {
           .order("closure_date");
         if (error) throw error;
         return json({ year, closures: data ?? [] }, 200, c);
+      }
+      if (scope === "team_overview") {
+        if (!isAdmin) return json({ error: "Keine Berechtigung" }, 403, c);
+        const year = Number(params.get("year") || yearNow);
+        return json(await buildTeamOverview(service, kalender, year), 200, c);
+      }
+      if (scope === "staff") {
+        if (!isAdmin) return json({ error: "Keine Berechtigung" }, 403, c);
+        return json(await loadStaffSettings(service), 200, c);
       }
       const { data, error } = await service
         .from("urlaub_requests")
@@ -872,6 +985,36 @@ Deno.serve(async (req) => {
           .single();
         if (error) throw error;
         return json(data, 200, c);
+      }
+
+      if (action === "update_urlaubstage") {
+        if (!isAdmin) return json({ error: "Keine Berechtigung" }, 403, c);
+        const user_id = String(body.user_id ?? "").trim();
+        const raw = body.urlaubstage;
+        const days = Number(raw);
+        if (!user_id) return json({ error: "user_id erforderlich" }, 400, c);
+        if (!Number.isFinite(days) || days < 0 || days > 365) {
+          return json({ error: "urlaubstage muss zwischen 0 und 365 liegen" }, 400, c);
+        }
+        const urlaubstage = Math.floor(days);
+        const { data, error } = await service
+          .schema("users")
+          .from("profiles")
+          .update({ urlaubstage, updated_at: new Date().toISOString() })
+          .eq("id", user_id)
+          .select("id,full_name,kuerzel,urlaubstage")
+          .single();
+        if (error) throw error;
+        return json(
+          {
+            user_id: data.id,
+            full_name: data.full_name,
+            kuerzel: data.kuerzel,
+            urlaubstage: getUrlaubstage(data),
+          },
+          200,
+          c,
+        );
       }
 
       return json({ error: "Unbekannte Aktion" }, 400, c);
