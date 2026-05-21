@@ -190,10 +190,16 @@
     }
     .closure-list { display: flex; flex-direction: column; gap: .65rem; }
     .closure-row {
-      display: grid; grid-template-columns: 10rem minmax(14rem, 1fr) 8.5rem 7.5rem; gap: 1rem; align-items: center;
+      display: grid; grid-template-columns: 11rem minmax(18rem, 1fr) 9rem 8rem; gap: 1rem; align-items: center;
       border: 1px solid var(--line); border-radius: 12px; padding: .85rem 1rem; background: var(--status-bg);
     }
-    @media (max-width: 900px) { .closure-row { grid-template-columns: 1fr 1fr; } .closure-row > :last-child { grid-column: 1 / -1; } }
+    #admin-settings-modal .settings-table-head.closure-head {
+      grid-template-columns: 11rem minmax(18rem, 1fr) 9rem 8rem;
+    }
+    @media (max-width: 900px) {
+      .closure-row { grid-template-columns: 1fr 1fr; }
+      .closure-row > :last-child { grid-column: 1 / -1; justify-self: start; }
+    }
     @media (max-width: 560px) { .closure-row { grid-template-columns: 1fr; } }
     .closure-row-date { font-size: .88rem; font-weight: 700; color: var(--ink); line-height: 1.35; }
     .closure-row-badge {
@@ -243,26 +249,13 @@
       display: grid; gap: 1rem; padding: 0 1rem .45rem;
       font-size: .72rem; font-weight: 700; color: var(--muted); text-transform: uppercase; letter-spacing: .04em;
     }
-    .settings-table-head.closure-head { grid-template-columns: 10rem minmax(14rem, 1fr) 8.5rem 7.5rem; }
+    .settings-table-head.closure-head { grid-template-columns: 11rem minmax(18rem, 1fr) 9rem 8rem; }
     @media (max-width: 900px) { .settings-table-head { display: none; } }
 
     .settings-tab-panel[hidden] { display: none !important; }
-    .modal-box--wide {
-      max-width: min(1320px, 98vw); width: 100%; padding: 0; overflow: hidden;
-    }
-    .modal-box--wide .modal-box-head {
-      display: flex; align-items: center; justify-content: space-between; gap: 1rem;
-      padding: 1.35rem 2.25rem; border-bottom: 1px solid var(--line);
-    }
-    .modal-box--wide .modal-box-head h2 { margin: 0; font-size: 1.25rem; }
-    .modal-box--wide .modal-box-sub { margin: .35rem 0 0; font-size: .9rem; color: var(--muted); font-weight: 500; }
-    .modal-box--wide .modal-box-body {
-      padding: 1.5rem 2.25rem 2rem; max-height: min(86vh, 860px); overflow-y: auto;
-    }
-    .closure-list { max-height: min(58vh, 520px); overflow-y: auto; }
     .modal-close-btn {
       width: 36px; height: 36px; border: none; border-radius: 50%; background: var(--status-bg);
-      color: var(--muted); cursor: pointer; font-size: 1rem;
+      color: var(--muted); cursor: pointer; font-size: 1rem; flex-shrink: 0;
     }
     .modal-close-btn:hover { background: var(--line); color: var(--ink); }
 
@@ -276,12 +269,35 @@
       align-items: center; justify-content: center; padding: .75rem;
     }
     .modal-overlay.is-open { display: flex; }
+    #admin-settings-modal { padding: 1rem; }
     .modal-box {
       background: var(--bg); border-radius: var(--radius); box-shadow: var(--shadow-modal);
       width: 100%; max-width: 420px; padding: 1.75rem;
     }
     .modal-box h2 { font-size: 1.15rem; margin-bottom: .5rem; }
     .modal-box p { color: var(--muted); font-size: .9rem; margin-bottom: 1rem; }
+    .modal-box.modal-box--wide {
+      max-width: min(1200px, calc(100vw - 2rem));
+      width: min(1200px, calc(100vw - 2rem));
+      padding: 0;
+      overflow: hidden;
+    }
+    .modal-box.modal-box--wide .modal-box-head {
+      display: flex; align-items: center; justify-content: space-between; gap: 1rem;
+      padding: 1.35rem 2rem; border-bottom: 1px solid var(--line);
+    }
+    .modal-box.modal-box--wide .modal-box-head h2 { margin: 0; font-size: 1.25rem; }
+    .modal-box.modal-box--wide .modal-box-sub { margin: .35rem 0 0; font-size: .9rem; color: var(--muted); font-weight: 500; }
+    .modal-box.modal-box--wide .modal-box-body {
+      padding: 1.5rem 2rem 2rem; max-height: min(86vh, 860px); overflow-y: auto;
+    }
+    #admin-settings-modal .closure-list { max-height: min(58vh, 520px); overflow-y: auto; }
+    @media (max-width: 720px) {
+      .modal-box.modal-box--wide {
+        max-width: calc(100vw - 1rem);
+        width: calc(100vw - 1rem);
+      }
+    }
     .modal-actions { display: flex; gap: .65rem; margin-top: 1rem; }
     .btn-secondary {
       flex: 1; padding: .7rem 1rem; background: var(--status-bg); border: 1px solid var(--line);
