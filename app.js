@@ -19,8 +19,6 @@ let closures = [];
 let closureYear = new Date().getFullYear();
 let teamOverview = [];
 let teamOverviewYear = new Date().getFullYear();
-let staffSettings = [];
-let settingsTab = "staff";
 
 const els = {};
 
@@ -194,7 +192,7 @@ async function refreshRole() {
   if (els.adminBadge) els.adminBadge.hidden = !isAdmin;
   if (els.greetingDesc) {
     els.greetingDesc.textContent = isAdmin
-      ? "Prüfe offene Urlaubsanträge und behalte Urlaubskontingente im Blick. Über „Admin-Einstellungen“ oben rechts kannst du Urlaubstage und Betriebsferien verwalten."
+      ? "Prüfe offene Urlaubsanträge und behalte Urlaubskontingente im Blick. Über „Admin-Einstellungen“ oben rechts kannst du Betriebsferien und freie Tage verwalten."
       : "Reiche hier deinen Urlaub ein. Nach der Freigabe durch einen Admin wird er automatisch im Team-Kalender eingetragen. Wochenenden und Feiertage sind nicht möglich.";
   }
 }
@@ -268,88 +266,17 @@ function renderTeamOverview() {
     .join("");
 }
 
-async function loadStaffSettings() {
-  if (!isAdmin) return;
-  const data = await api("GET", null, "?scope=staff");
-  staffSettings = data?.staff || [];
-  renderStaffSettings();
-}
-
-function renderStaffSettings() {
-  if (!els.adminStaffList) return;
-  if (!staffSettings.length) {
-    els.adminStaffList.innerHTML =
-      '<div class="empty-state"><i class="fa-solid fa-user"></i><p>Keine Mitarbeiter gefunden.</p></div>';
-    return;
-  }
-  els.adminStaffList.innerHTML = staffSettings
-    .map(
-      (row) => `<div class="staff-row" data-staff-id="${row.user_id}">
-        <div>
-          <div class="staff-row-name">${escapeHtml(row.full_name)}</div>
-          <div class="staff-row-meta">${escapeHtml(row.kuerzel || "—")}</div>
-        </div>
-        <div>
-          <div class="staff-field-label">Urlaubstage / Jahr</div>
-          <input type="number" min="0" max="365" step="1" data-field="urlaubstage" value="${Number(row.urlaubstage || 0)}" aria-label="Urlaubstage pro Jahr für ${escapeHtml(row.full_name)}" />
-        </div>
-        <button type="button" class="btn-closure-save" data-save-staff="${row.user_id}">Speichern</button>
-      </div>`,
-    )
-    .join("");
-  els.adminStaffList.querySelectorAll("[data-save-staff]").forEach((btn) => {
-    btn.addEventListener("click", () => void saveStaffUrlaubstage(btn.dataset.saveStaff));
-  });
-}
-
-async function saveStaffUrlaubstage(userId) {
-  const rowEl = els.adminStaffList?.querySelector(`[data-staff-id="${userId}"]`);
-  if (!rowEl) return;
-  const urlaubstage = rowEl.querySelector('[data-field="urlaubstage"]')?.value;
-  const btn = rowEl.querySelector("[data-save-staff]");
-  if (btn) {
-    btn.disabled = true;
-    btn.textContent = "Speichern…";
-  }
-  try {
-    await api("POST", { action: "update_urlaubstage", user_id: userId, urlaubstage });
-    toast("Urlaubstage gespeichert", "ok");
-    await loadStaffSettings();
-    await loadTeamOverview(teamOverviewYear);
-  } catch (e) {
-    toast(e.message || "Speichern fehlgeschlagen", "err");
-  } finally {
-    if (btn) {
-      btn.disabled = false;
-      btn.textContent = "Speichern";
-    }
-  }
-}
-
 async function openAdminSettingsModal() {
   if (!isAdmin || !els.adminSettingsModal) return;
-  settingsTab = "staff";
-  setSettingsTab("staff");
   els.adminSettingsModal.classList.add("is-open");
   els.adminSettingsModal.setAttribute("aria-hidden", "false");
-  await Promise.all([loadStaffSettings(), loadClosures(closureYear)]);
+  await loadClosures(closureYear);
 }
 
 function closeAdminSettingsModal() {
   if (!els.adminSettingsModal) return;
   els.adminSettingsModal.classList.remove("is-open");
   els.adminSettingsModal.setAttribute("aria-hidden", "true");
-}
-
-function setSettingsTab(tab) {
-  settingsTab = tab;
-  els.settingsTabs?.forEach((btn) => {
-    const on = btn.dataset.settingsTab === tab;
-    btn.classList.toggle("is-active", on);
-    btn.setAttribute("aria-selected", on ? "true" : "false");
-  });
-  if (els.settingsTabStaff) els.settingsTabStaff.hidden = tab !== "staff";
-  if (els.settingsTabClosures) els.settingsTabClosures.hidden = tab !== "closures";
 }
 
 async function loadClosures(year) {
@@ -433,7 +360,7 @@ async function refreshData() {
     if (!isAdmin) await loadBalance();
     await loadRequests();
     if (isAdmin && els.adminSettingsModal?.classList.contains("is-open")) {
-      await Promise.all([loadStaffSettings(), loadClosures(closureYear)]);
+      await loadClosures(closureYear);
     }
   } catch (e) {
     console.warn("Hintergrund-Aktualisierung fehlgeschlagen", e);
@@ -724,11 +651,6 @@ function bindUi() {
       if (e.target === els.adminSettingsModal) closeAdminSettingsModal();
     });
   }
-  if (els.settingsTabs) {
-    els.settingsTabs.forEach((btn) => {
-      btn.addEventListener("click", () => setSettingsTab(btn.dataset.settingsTab || "staff"));
-    });
-  }
   if (els.settingsClosureYear) {
     els.settingsClosureYear.addEventListener("change", () => {
       void loadClosures(Number(els.settingsClosureYear.value) || new Date().getFullYear());
@@ -765,10 +687,6 @@ function cacheEls() {
   els.btnAdminSettings = document.getElementById("btn-admin-settings");
   els.adminSettingsModal = document.getElementById("admin-settings-modal");
   els.btnAdminSettingsClose = document.getElementById("btn-admin-settings-close");
-  els.settingsTabs = document.querySelectorAll("[data-settings-tab]");
-  els.settingsTabStaff = document.getElementById("settings-tab-staff");
-  els.settingsTabClosures = document.getElementById("settings-tab-closures");
-  els.adminStaffList = document.getElementById("admin-staff-list");
   els.settingsClosuresList = document.getElementById("admin-settings-closures-list");
   els.settingsClosureYear = document.getElementById("settings-closure-year");
   els.closureYear = document.getElementById("closure-year");

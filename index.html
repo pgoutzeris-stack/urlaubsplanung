@@ -188,10 +188,11 @@
     }
     .closure-list { display: flex; flex-direction: column; gap: .65rem; }
     .closure-row {
-      display: grid; grid-template-columns: 7.5rem 1fr 7rem 6.5rem; gap: .65rem; align-items: center;
-      border: 1px solid var(--line); border-radius: 12px; padding: .75rem .85rem; background: var(--status-bg);
+      display: grid; grid-template-columns: 10rem minmax(14rem, 1fr) 8.5rem 7.5rem; gap: 1rem; align-items: center;
+      border: 1px solid var(--line); border-radius: 12px; padding: .85rem 1rem; background: var(--status-bg);
     }
-    @media (max-width: 720px) { .closure-row { grid-template-columns: 1fr; } }
+    @media (max-width: 900px) { .closure-row { grid-template-columns: 1fr 1fr; } .closure-row > :last-child { grid-column: 1 / -1; } }
+    @media (max-width: 560px) { .closure-row { grid-template-columns: 1fr; } }
     .closure-row-date { font-size: .88rem; font-weight: 700; color: var(--ink); line-height: 1.35; }
     .closure-row-badge {
       display: inline-flex; margin-top: .2rem; padding: .15rem .45rem; border-radius: 999px;
@@ -237,47 +238,26 @@
     }
     .settings-hint i { color: var(--brand); margin-top: .15rem; flex-shrink: 0; }
     .settings-table-head {
-      display: grid; gap: .65rem; padding: 0 .85rem .45rem;
+      display: grid; gap: 1rem; padding: 0 1rem .45rem;
       font-size: .72rem; font-weight: 700; color: var(--muted); text-transform: uppercase; letter-spacing: .04em;
     }
-    .settings-table-head.staff-head { grid-template-columns: 1fr 8.5rem 6.5rem; }
-    .settings-table-head.closure-head { grid-template-columns: 7.5rem 1fr 7rem 6.5rem; }
-    @media (max-width: 720px) { .settings-table-head { display: none; } }
+    .settings-table-head.closure-head { grid-template-columns: 10rem minmax(14rem, 1fr) 8.5rem 7.5rem; }
+    @media (max-width: 900px) { .settings-table-head { display: none; } }
 
-    .staff-settings-list { display: flex; flex-direction: column; gap: .65rem; max-height: min(52vh, 460px); overflow-y: auto; }
-    .staff-row {
-      display: grid; grid-template-columns: 1fr 8.5rem 6.5rem; gap: .65rem; align-items: center;
-      border: 1px solid var(--line); border-radius: 12px; padding: .75rem .85rem; background: var(--status-bg);
-    }
-    @media (max-width: 720px) { .staff-row { grid-template-columns: 1fr; } }
-    .staff-row-name { font-size: .9rem; font-weight: 700; }
-    .staff-row-meta { font-size: .75rem; color: var(--muted); margin-top: .1rem; }
-    .staff-field-label { display: none; font-size: .72rem; font-weight: 700; color: var(--muted); margin-bottom: .25rem; text-transform: uppercase; letter-spacing: .04em; }
-    @media (max-width: 720px) { .staff-field-label { display: block; } }
-    .staff-row input[type="number"] {
-      width: 100%; height: 38px; padding: 0 .65rem; border: 1px solid var(--line); border-radius: 10px;
-      font-family: inherit; font-size: .88rem; background: var(--bg);
-    }
-
-    .settings-tabs { display: flex; gap: .5rem; margin-bottom: 1.15rem; flex-wrap: wrap; }
-    .settings-tab {
-      height: 36px; padding: 0 1rem; border: 1px solid var(--line); border-radius: 999px;
-      background: var(--bg); color: var(--muted); font-family: inherit; font-size: .85rem; font-weight: 600; cursor: pointer;
-    }
-    .settings-tab.is-active { border-color: var(--brand); color: var(--brand); background: var(--brand-light); }
     .settings-tab-panel[hidden] { display: none !important; }
     .modal-box--wide {
-      max-width: min(1080px, 96vw); width: 100%; padding: 0; overflow: hidden;
+      max-width: min(1320px, 98vw); width: 100%; padding: 0; overflow: hidden;
     }
     .modal-box--wide .modal-box-head {
       display: flex; align-items: center; justify-content: space-between; gap: 1rem;
-      padding: 1.35rem 2rem; border-bottom: 1px solid var(--line);
+      padding: 1.35rem 2.25rem; border-bottom: 1px solid var(--line);
     }
     .modal-box--wide .modal-box-head h2 { margin: 0; font-size: 1.25rem; }
+    .modal-box--wide .modal-box-sub { margin: .35rem 0 0; font-size: .9rem; color: var(--muted); font-weight: 500; }
     .modal-box--wide .modal-box-body {
-      padding: 1.5rem 2rem 2rem; max-height: min(84vh, 820px); overflow-y: auto;
+      padding: 1.5rem 2.25rem 2rem; max-height: min(86vh, 860px); overflow-y: auto;
     }
-    .closure-list { max-height: min(52vh, 460px); overflow-y: auto; }
+    .closure-list { max-height: min(58vh, 520px); overflow-y: auto; }
     .modal-close-btn {
       width: 36px; height: 36px; border: none; border-radius: 50%; background: var(--status-bg);
       color: var(--muted); cursor: pointer; font-size: 1rem;
@@ -291,7 +271,7 @@
     .modal-overlay {
       display: none; position: fixed; inset: 0; z-index: 10000;
       background: rgba(15,23,42,.55); backdrop-filter: blur(4px);
-      align-items: center; justify-content: center; padding: 1rem;
+      align-items: center; justify-content: center; padding: .75rem;
     }
     .modal-overlay.is-open { display: flex; }
     .modal-box {
@@ -528,43 +508,28 @@
 <div class="modal-overlay" id="admin-settings-modal" aria-hidden="true">
   <div class="modal-box modal-box--wide" role="dialog" aria-labelledby="admin-settings-title">
     <div class="modal-box-head">
-      <h2 id="admin-settings-title"><i class="fa-solid fa-gear" style="color:var(--brand);margin-right:.45rem"></i> Admin-Einstellungen</h2>
+      <div>
+        <h2 id="admin-settings-title"><i class="fa-solid fa-gear" style="color:var(--brand);margin-right:.45rem"></i> Admin-Einstellungen</h2>
+        <p class="modal-box-sub">Betriebsferien und firmenfreie Tage verwalten</p>
+      </div>
       <button type="button" class="modal-close-btn" id="btn-admin-settings-close" aria-label="Schließen"><i class="fa-solid fa-xmark"></i></button>
     </div>
     <div class="modal-box-body">
-      <div class="settings-tabs" role="tablist">
-        <button type="button" class="settings-tab is-active" data-settings-tab="staff" role="tab" aria-selected="true">Urlaubstage pro Mitarbeiter</button>
-        <button type="button" class="settings-tab" data-settings-tab="closures" role="tab" aria-selected="false">Betriebsferien &amp; freie Tage</button>
+      <div class="settings-hint">
+        <i class="fa-solid fa-circle-info"></i>
+        <div>Firmenfreie Tage und Betriebsferien trägst du hier ein. Sie erscheinen automatisch im Team-Kalender und können von Mitarbeitern nicht selbst geändert werden.</div>
       </div>
-      <div class="settings-tab-panel" id="settings-tab-staff" role="tabpanel">
-        <div class="settings-hint">
-          <i class="fa-solid fa-circle-info"></i>
-          <div>Hier legst du fest, wie viele Urlaubstage jede Person pro Jahr hat. Genehmigte und noch offene Anträge werden automatisch davon abgezogen.</div>
-        </div>
-        <div class="settings-table-head staff-head">
-          <span>Mitarbeiter</span>
-          <span>Urlaubstage / Jahr</span>
-          <span></span>
-        </div>
-        <div class="staff-settings-list" id="admin-staff-list"></div>
+      <div class="closure-toolbar">
+        <label for="settings-closure-year">Jahr auswählen</label>
+        <select id="settings-closure-year"></select>
       </div>
-      <div class="settings-tab-panel" id="settings-tab-closures" role="tabpanel" hidden>
-        <div class="settings-hint">
-          <i class="fa-solid fa-circle-info"></i>
-          <div>Firmenfreie Tage und Betriebsferien trägst du hier ein. Sie erscheinen automatisch im Team-Kalender und können von Mitarbeitern nicht selbst geändert werden.</div>
-        </div>
-        <div class="closure-toolbar">
-          <label for="settings-closure-year">Jahr auswählen</label>
-          <select id="settings-closure-year"></select>
-        </div>
-        <div class="settings-table-head closure-head">
-          <span>Datum</span>
-          <span>Bezeichnung</span>
-          <span>Abzug Urlaub</span>
-          <span></span>
-        </div>
-        <div class="closure-list" id="admin-settings-closures-list"></div>
+      <div class="settings-table-head closure-head">
+        <span>Datum</span>
+        <span>Bezeichnung</span>
+        <span>Abzug Urlaub</span>
+        <span></span>
       </div>
+      <div class="closure-list" id="admin-settings-closures-list"></div>
     </div>
   </div>
 </div>
