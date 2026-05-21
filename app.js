@@ -100,8 +100,8 @@ async function refreshRole() {
   isAdmin = Boolean(window.RootsUser?.isAdmin?.());
   els.adminPanel.hidden = !isAdmin;
   els.userPanel.hidden = isAdmin;
-  els.userBadge.hidden = isAdmin;
-  els.adminBadge.hidden = !isAdmin;
+  if (els.userBadge) els.userBadge.hidden = isAdmin;
+  if (els.adminBadge) els.adminBadge.hidden = !isAdmin;
   if (els.greetingDesc) {
     els.greetingDesc.textContent = isAdmin
       ? "Prüfe offene Urlaubsanträge. Bei Genehmigung wird der Urlaub automatisch im Team-Kalender eingetragen."

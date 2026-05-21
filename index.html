@@ -107,13 +107,13 @@
 
     .stats-row { display: grid; grid-template-columns: repeat(auto-fit, minmax(160px, 1fr)); gap: 1rem; margin-bottom: 1.75rem; }
     .stat-card {
-      background: var(--bg); border-radius: var(--radius-dash); padding: 1.1rem 1.25rem;
-      box-shadow: var(--shadow-dash); border: 1px solid var(--line);
+      border-radius: var(--radius-dash); padding: 1.1rem 1.25rem;
     }
     .stat-label { font-size: .8rem; color: var(--muted); margin-bottom: .35rem; }
     .stat-value { font-size: 1.6rem; font-weight: 700; color: var(--brand); }
 
-    .layout-grid { display: grid; grid-template-columns: 1fr 1.1fr; gap: 1.25rem; align-items: start; }
+    .layout-grid { display: grid; grid-template-columns: 1fr 1.1fr; gap: 1.25rem; align-items: stretch; }
+    .layout-grid .panel { display: flex; flex-direction: column; }
     @media (max-width: 900px) { .layout-grid { grid-template-columns: 1fr; } }
 
     .panel {
@@ -243,8 +243,6 @@
       <span class="header-sub">Urlaub einreichen &amp; freigeben</span>
     </div>
     <div class="header-right">
-      <span class="role-badge" id="user-badge">Mitarbeiter</span>
-      <span class="role-badge role-badge--admin" id="admin-badge" hidden>Admin</span>
       <div class="dash-avatar" id="user-avatar" style="cursor:pointer" title="Profil"></div>
       <span id="user-name-topbar" class="header-sub"></span>
     </div>
@@ -260,8 +258,8 @@
     <div id="user-panel">
       <div class="stats-row" id="user-stats">
         <div class="stat-card"><div class="stat-label">Urlaubstage</div><div class="stat-value" id="stat-remaining">—</div></div>
-        <div class="stat-card"><div class="stat-label">Offen</div><div class="stat-value" id="stat-pending">0</div></div>
-        <div class="stat-card"><div class="stat-label">Genehmigt</div><div class="stat-value" id="stat-approved">0</div></div>
+        <div class="stat-card"><div class="stat-label">Offene Anträge</div><div class="stat-value" id="stat-pending">0</div></div>
+        <div class="stat-card"><div class="stat-label">Genehmigte Anträge</div><div class="stat-value" id="stat-approved">0</div></div>
       </div>
       <div class="layout-grid">
         <section class="panel">
