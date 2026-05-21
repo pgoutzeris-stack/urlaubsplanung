@@ -601,6 +601,7 @@ import { initApp } from './app.js';
 
 const { createClient } = window.supabase;
 const sb = createClient(SB_URL, SB_ANON);
+window.__rootsSupabaseClient = sb;
 const LOGIN_HTML = '<i class="fa-solid fa-arrow-right-to-bracket"></i> Anmelden';
 
 function resetLoginBtn() {
