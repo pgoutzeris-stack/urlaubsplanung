@@ -387,15 +387,23 @@
     <button id="rus-close" aria-label="Schließen"><i class="fa-solid fa-xmark"></i></button>
     <div class="rus-modal-head">
       <p style="font-size:.75rem;font-weight:700;text-transform:uppercase;letter-spacing:.08em;color:var(--brand);margin-bottom:.75rem">ROOTS URLAUB</p>
-      <div class="rus-av-wrap" id="rus-av-wrap">
-        <canvas id="rus-crop-canvas" width="120" height="120"></canvas>
-        <div class="rus-av-pencil"><i class="fa-solid fa-pen"></i></div>
+      <div style="margin-bottom:1.25rem">
+        <div id="rus-av-wrap" style="position:relative;width:120px;height:120px;border-radius:50%;margin:0 auto;cursor:pointer;user-select:none">
+          <canvas id="rus-crop-canvas" width="120" height="120" style="border-radius:50%;border:3px solid #206efb;display:block;box-shadow:0 2px 12px rgba(32,110,251,.15);cursor:grab;touch-action:none"></canvas>
+          <div id="rus-av-pencil" style="position:absolute;inset:0;border-radius:50%;background:rgba(0,0,0,.55);color:#fff;display:flex;flex-direction:column;align-items:center;justify-content:center;opacity:0;transition:opacity .2s;pointer-events:none">
+            <i class="fa-solid fa-camera" style="font-size:1.3rem"></i>
+            <span style="font-size:.65rem;margin-top:.2rem;font-weight:600;letter-spacing:.03em">Ändern</span>
+          </div>
+        </div>
         <input type="file" id="rus-file-input" accept="image/*" hidden />
-      </div>
-      <div id="rus-zoom-row">
-        <i class="fa-solid fa-magnifying-glass-minus"></i>
-        <input type="range" id="rus-zoom-slider" min="1" max="3" step="0.01" value="1" />
-        <i class="fa-solid fa-magnifying-glass-plus"></i>
+        <div id="rus-zoom-controls" style="display:flex;align-items:center;gap:.55rem;margin:.85rem auto 0;max-width:260px">
+          <i class="fa-solid fa-magnifying-glass-minus" style="color:#94a3b8;font-size:.75rem"></i>
+          <input type="range" id="rus-zoom-slider" min="1" max="4" step="0.01" value="1" disabled style="flex:1;accent-color:#206efb">
+          <i class="fa-solid fa-magnifying-glass-plus" style="color:#94a3b8;font-size:.75rem"></i>
+          <button type="button" id="rus-reset-zoom" disabled title="Zurücksetzen" style="background:none;border:none;color:#94a3b8;cursor:pointer;padding:2px 4px;display:inline-flex;align-items:center">
+            <i class="fa-solid fa-rotate-left" style="font-size:.78rem"></i>
+          </button>
+        </div>
       </div>
       <h2 id="rus-modal-title" style="font-size:1.1rem;font-weight:700;margin-bottom:.15rem">Mein Profil</h2>
     </div>
@@ -447,52 +455,120 @@ window.RootsUser = window.RootsUser || {
   },
   _cropDraw(){
     const c=document.getElementById('rus-crop-canvas');if(!c)return;
-    const cx=c.getContext('2d');
-    const BRAND='#206efb',BRAND_LIGHT='#eff6ff';
-    if(!this._cs){
-      cx.clearRect(0,0,120,120);cx.beginPath();cx.arc(60,60,60,0,Math.PI*2);
-      cx.fillStyle=BRAND_LIGHT;cx.fill();
-      cx.fillStyle=BRAND;cx.font='bold 36px "Circular Std",system-ui,sans-serif';cx.textAlign='center';cx.textBaseline='middle';
-      cx.fillText(this._initials(this._p?.full_name),60,60);
-      cx.beginPath();cx.arc(60,60,59,0,Math.PI*2);cx.strokeStyle=BRAND;cx.lineWidth=3;cx.stroke();
+    const cx=c.getContext('2d');cx.clearRect(0,0,120,120);
+    if(!this._cs||!this._cs.img){
+      cx.beginPath();cx.arc(60,60,60,0,Math.PI*2);
+      cx.fillStyle='#eff6ff';cx.fill();
+      cx.fillStyle='#206efb';cx.font='bold 32px "Circular Std",system-ui,sans-serif';
+      cx.textAlign='center';cx.textBaseline='middle';
+      cx.fillText(this._initials(this._p&&this._p.full_name),60,60);
       return;
     }
-    const{img,x,y,zoom}=this._cs;
-    cx.clearRect(0,0,120,120);cx.save();
-    cx.beginPath();cx.arc(60,60,60,0,Math.PI*2);cx.clip();
-    const s=Math.min(img.naturalWidth,img.naturalHeight)*zoom;
-    const sx=(img.naturalWidth-s)/2-x*s/120,sy=(img.naturalHeight-s)/2-y*s/120;
-    cx.drawImage(img,sx,sy,s,s,0,0,120,120);cx.restore();
-    cx.beginPath();cx.arc(60,60,59,0,Math.PI*2);cx.strokeStyle=BRAND;cx.lineWidth=3;cx.stroke();
+    const{img,scale,x,y,baseScale}=this._cs;
+    const eff=baseScale*scale,dw=img.naturalWidth*eff,dh=img.naturalHeight*eff;
+    const dx=(120-dw)/2+x,dy=(120-dh)/2+y;
+    cx.save();cx.beginPath();cx.arc(60,60,60,0,Math.PI*2);cx.clip();
+    cx.drawImage(img,dx,dy,dw,dh);cx.restore();
   },
   _cropLoad(file){
-    const url=URL.createObjectURL(file);const img=new Image();
+    if(!file||!file.type.startsWith('image/'))return;
+    const r=new FileReader();r.onload=()=>this._setImageSrc(r.result);r.readAsDataURL(file);
+  },
+  _setImageSrc(src){
+    const img=new Image();
     img.onload=()=>{
-      this._cs={img,x:0,y:0,zoom:1};
-      const sl=document.getElementById('rus-zoom-slider');if(sl)sl.value=1;
-      const zr=document.getElementById('rus-zoom-row');if(zr)zr.style.display='flex';
+      const baseScale=Math.max(120/img.naturalWidth,120/img.naturalHeight);
+      this._cs={img,baseScale,scale:1,x:0,y:0,dragging:false,lastX:0,lastY:0};
+      const sl=document.getElementById('rus-zoom-slider');
+      const rb=document.getElementById('rus-reset-zoom');
+      if(sl){sl.disabled=false;sl.value='1';}
+      if(rb)rb.disabled=false;
       this._cropDraw();
-    };img.src=url;
+    };
+    img.onerror=()=>{this._cs=null;this._cropDraw();};
+    img.src=src;
   },
   _initCropEditor(){
-    const c=document.getElementById('rus-crop-canvas');if(!c||c._cropBound)return;c._cropBound=true;
-    let drag=null;
-    const onDown=e=>{if(!this._cs)return;const r=c.getBoundingClientRect();const pt=e.touches?e.touches[0]:e;drag={x0:pt.clientX-r.left,y0:pt.clientY-r.top,px:this._cs.x,py:this._cs.y};e.preventDefault();};
-    const onMove=e=>{if(!drag||!this._cs)return;const r=c.getBoundingClientRect();const pt=e.touches?e.touches[0]:e;const dx=pt.clientX-r.left-drag.x0,dy=pt.clientY-r.top-drag.y0;this._cs.x=drag.px-dx/this._cs.zoom;this._cs.y=drag.py-dy/this._cs.zoom;this._cropDraw();e.preventDefault();};
-    const onUp=()=>{drag=null;};
-    c.addEventListener('mousedown',onDown);window.addEventListener('mousemove',onMove);window.addEventListener('mouseup',onUp);
-    c.addEventListener('touchstart',onDown,{passive:false});window.addEventListener('touchmove',onMove,{passive:false});window.addEventListener('touchend',onUp);
-    c.addEventListener('wheel',e=>{if(!this._cs)return;this._cs.zoom=Math.min(3,Math.max(1,this._cs.zoom-e.deltaY*.003));const sl=document.getElementById('rus-zoom-slider');if(sl)sl.value=this._cs.zoom;this._cropDraw();e.preventDefault();},{passive:false});
-    const sl=document.getElementById('rus-zoom-slider');if(sl)sl.addEventListener('input',()=>{if(this._cs){this._cs.zoom=+sl.value;this._cropDraw();}});
+    if(this._editorReady)return;this._editorReady=true;
+    const c=document.getElementById('rus-crop-canvas');
+    const wrap=document.getElementById('rus-av-wrap');
+    const pen=document.getElementById('rus-av-pencil');
     const fi=document.getElementById('rus-file-input');
-    document.getElementById('rus-av-wrap')?.addEventListener('click',()=>fi.click());
-    fi.addEventListener('change',()=>{if(fi.files[0])this._cropLoad(fi.files[0]);});
+    const sl=document.getElementById('rus-zoom-slider');
+    const rb=document.getElementById('rus-reset-zoom');
+    if(!c||!wrap||!fi)return;
+    let dragged=false;
+    wrap.addEventListener('mouseenter',()=>{if(pen)pen.style.opacity='1';});
+    wrap.addEventListener('mouseleave',()=>{if(pen)pen.style.opacity='0';});
+    wrap.addEventListener('click',e=>{
+      if(dragged){dragged=false;return;}
+      if(rb&&(e.target===rb||rb.contains(e.target)))return;
+      if(sl&&e.target===sl)return;
+      fi.click();
+    });
+    fi.addEventListener('change',()=>{
+      if(fi.files&&fi.files[0])this._cropLoad(fi.files[0]);
+      fi.value='';
+    });
+    c.addEventListener('mousedown',e=>{
+      if(!this._cs||!this._cs.img)return;
+      e.preventDefault();
+      this._cs.dragging=true;this._cs.lastX=e.clientX;this._cs.lastY=e.clientY;
+      dragged=false;c.style.cursor='grabbing';
+    });
+    document.addEventListener('mousemove',e=>{
+      if(!this._cs||!this._cs.dragging)return;
+      const dx=e.clientX-this._cs.lastX,dy=e.clientY-this._cs.lastY;
+      if(Math.abs(dx)>2||Math.abs(dy)>2)dragged=true;
+      this._cs.x+=dx;this._cs.y+=dy;
+      this._cs.lastX=e.clientX;this._cs.lastY=e.clientY;
+      this._cropDraw();
+    });
+    document.addEventListener('mouseup',()=>{
+      if(this._cs&&this._cs.dragging){this._cs.dragging=false;c.style.cursor='grab';}
+    });
+    c.addEventListener('touchstart',e=>{
+      if(!this._cs||!this._cs.img)return;
+      e.preventDefault();
+      this._cs.dragging=true;
+      this._cs.lastX=e.touches[0].clientX;this._cs.lastY=e.touches[0].clientY;
+      dragged=false;
+    },{passive:false});
+    c.addEventListener('touchmove',e=>{
+      if(!this._cs||!this._cs.dragging)return;
+      e.preventDefault();
+      const t=e.touches[0];
+      const dx=t.clientX-this._cs.lastX,dy=t.clientY-this._cs.lastY;
+      if(Math.abs(dx)>2||Math.abs(dy)>2)dragged=true;
+      this._cs.x+=dx;this._cs.y+=dy;
+      this._cs.lastX=t.clientX;this._cs.lastY=t.clientY;
+      this._cropDraw();
+    },{passive:false});
+    c.addEventListener('touchend',()=>{if(this._cs)this._cs.dragging=false;});
+    c.addEventListener('wheel',e=>{
+      if(!this._cs||!this._cs.img)return;
+      e.preventDefault();
+      this._cs.scale=Math.max(1,Math.min(4,this._cs.scale-e.deltaY*.0015));
+      if(sl)sl.value=this._cs.scale;
+      this._cropDraw();
+    },{passive:false});
+    if(sl)sl.addEventListener('input',()=>{
+      if(!this._cs||!this._cs.img)return;
+      this._cs.scale=parseFloat(sl.value);this._cropDraw();
+    });
+    if(rb)rb.addEventListener('click',e=>{
+      e.stopPropagation();
+      if(!this._cs||!this._cs.img)return;
+      this._cs.scale=1;this._cs.x=0;this._cs.y=0;
+      if(sl)sl.value='1';
+      this._cropDraw();
+    });
   },
   _getCroppedDataURL(){
-    const out=document.createElement('canvas');out.width=200;out.height=200;
+    const out=document.createElement('canvas');out.width=240;out.height=240;
     const cx=out.getContext('2d');const src=document.getElementById('rus-crop-canvas');
-    if(src){cx.beginPath();cx.arc(100,100,100,0,Math.PI*2);cx.clip();cx.drawImage(src,0,0,120,120,0,0,200,200);}
-    return out.toDataURL('image/jpeg',.85);
+    if(src){cx.beginPath();cx.arc(120,120,120,0,Math.PI*2);cx.clip();cx.drawImage(src,0,0,120,120,0,0,240,240);}
+    return out.toDataURL('image/jpeg',0.88);
   },
   async _loadAndMount(sb){
     this._sb=sb;const{data:{session}}=await sb.auth.getSession();
@@ -513,20 +589,19 @@ window.RootsUser = window.RootsUser || {
     const p=this._p||{};
     const ni=document.getElementById('rus-name');if(ni)ni.value=p.full_name||'';
     const pi=document.getElementById('rus-position');if(pi)pi.value=p.position||'';
-    this._cs=null;
-    if(p.avatar_url){
-      const img=new Image();
-      img.onload=()=>{this._cs={img,x:0,y:0,zoom:1};const zr=document.getElementById('rus-zoom-row');if(zr)zr.style.display='flex';this._cropDraw();};
-      img.onerror=()=>{this._cs=null;this._cropDraw();};
-      img.src=p.avatar_url;
-    }else{this._cropDraw();}
-    const zr=document.getElementById('rus-zoom-row');if(zr)zr.style.display='none';
     ov.classList.add('rus-open');
     ov.onclick=e=>{if(e.target===ov)ov.classList.remove('rus-open');};
     document.getElementById('rus-close').onclick=()=>ov.classList.remove('rus-open');
     document.getElementById('rus-save').onclick=()=>this.saveSettings();
     document.getElementById('rus-logout').onclick=async()=>{ov.classList.remove('rus-open');if(this._sb)await this._sb.auth.signOut();};
+    this._cs=null;
+    const _sl=document.getElementById('rus-zoom-slider');
+    const _rb=document.getElementById('rus-reset-zoom');
+    if(_sl){_sl.disabled=true;_sl.value='1';}
+    if(_rb)_rb.disabled=true;
     this._initCropEditor();
+    this._cropDraw();
+    if(p.avatar_url)this._setImageSrc(p.avatar_url);
   },
   async saveSettings(){
     if(!this._sb||!this._uid)return;
