@@ -178,6 +178,18 @@ function sumDaysForYear(
   return total;
 }
 
+async function syncRootsClosures(
+  service: ReturnType<typeof createClient>,
+  userId: string,
+  year: number,
+) {
+  const { error } = await service.rpc("sync_roots_closures_for_user", {
+    p_user_id: userId,
+    p_year: year,
+  });
+  if (error) console.error("[urlaubsplanung] sync_roots_closures", error.message);
+}
+
 Deno.serve(async (req) => {
   const c = corsHeaders(req);
   if (req.method === "OPTIONS") return new Response("ok", { headers: c });
@@ -215,12 +227,19 @@ Deno.serve(async (req) => {
 
   const isAdmin = profile?.app_role === "admin";
   const displayName = (profile?.full_name || profile?.email || "Nutzer").trim();
+  const yearNow = new Date().getFullYear();
 
   try {
+    await syncRootsClosures(service, user.id, yearNow);
+    const profAfter = await loadProfile(service, user.id);
+    if (!profAfter.error && profAfter.data) {
+      Object.assign(profile || {}, profAfter.data);
+    }
+
     if (req.method === "GET") {
       const scope = new URL(req.url).searchParams.get("scope") || "mine";
       if (scope === "balance") {
-        const year = new Date().getFullYear();
+        const year = yearNow;
         const remaining = getUrlaubstage(profile);
         const { data: mine, error: mineErr } = await service
           .from("urlaub_requests")
@@ -233,12 +252,30 @@ Deno.serve(async (req) => {
           status: string;
         }>;
         const pending = sumDaysForYear(rows, year, new Set(["pending"]));
+        const { data: closureDays } = await kalender
+          .from("roots_closure_days")
+          .select("id")
+          .eq("calendar_year", year);
+        const closureIds = (closureDays ?? []).map((d) => d.id);
+        let rootsAutoDeducted = 0;
+        if (closureIds.length) {
+          const { data: rootsRows } = await service
+            .from("roots_closure_assignments")
+            .select("deducted_days")
+            .eq("user_id", user.id)
+            .in("closure_day_id", closureIds);
+          rootsAutoDeducted = (rootsRows ?? []).reduce(
+            (sum, r) => sum + Number(r.deducted_days || 0),
+            0,
+          );
+        }
         return json(
           {
             year,
             remaining,
             pending,
             default_annual: DEFAULT_URLAUBSTAGE,
+            roots_auto_deducted: rootsAutoDeducted,
           },
           200,
           c,

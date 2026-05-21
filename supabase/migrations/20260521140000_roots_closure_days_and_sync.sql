@@ -1,0 +1,2 @@
+-- Applied on Supabase project csmguwcvzreefluhahyu
+-- See Team-Kalender migration + public.sync_roots_closures_for_user
