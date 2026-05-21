@@ -13,6 +13,8 @@ let balance = null;
 let rejectTargetId = null;
 let holidaysByDate = new Map();
 let refreshTimer = null;
+let closures = [];
+let closureYear = new Date().getFullYear();
 
 const els = {};
 
@@ -201,6 +203,74 @@ async function loadRequests() {
   requests = (await api("GET", null, `?scope=${scope}`)) || [];
   renderLists();
   updateStats();
+  if (isAdmin) await loadClosures(closureYear);
+}
+
+async function loadClosures(year) {
+  if (!isAdmin) return;
+  closureYear = year;
+  const data = await api("GET", null, `?scope=closures&year=${year}`);
+  closures = data?.closures || [];
+  renderClosuresAdmin();
+}
+
+function renderClosuresAdmin() {
+  if (!els.adminClosuresList || !els.closureYear) return;
+  const yNow = new Date().getFullYear();
+  if (!els.closureYear.options.length) {
+    for (let y = yNow - 1; y <= yNow + 3; y++) {
+      const o = document.createElement("option");
+      o.value = String(y);
+      o.textContent = String(y);
+      els.closureYear.appendChild(o);
+    }
+  }
+  els.closureYear.value = String(closureYear);
+  if (!closures.length) {
+    els.adminClosuresList.innerHTML =
+      '<div class="empty-state"><i class="fa-regular fa-calendar"></i>Keine ROOTS-Tage für dieses Jahr hinterlegt.</div>';
+    return;
+  }
+  els.adminClosuresList.innerHTML = closures
+    .map(
+      (row) => `<div class="closure-row" data-closure-id="${row.id}">
+      <div>
+        <div class="closure-row-date">${formatDeYmd(row.closure_date)}</div>
+        <div class="closure-row-kind">${escapeHtml(row.closure_kind || "roots")}</div>
+      </div>
+      <input type="text" data-field="label" value="${escapeHtml(row.label || "")}" aria-label="Bezeichnung" />
+      <input type="number" data-field="deduct_days" min="0" max="5" step="0.5" value="${Number(row.deduct_days || 0)}" aria-label="Abzug Urlaubstage" />
+      <button type="button" class="btn-closure-save" data-save-closure="${row.id}">Speichern</button>
+    </div>`,
+    )
+    .join("");
+  els.adminClosuresList.querySelectorAll("[data-save-closure]").forEach((btn) => {
+    btn.addEventListener("click", () => void saveClosureRow(btn.dataset.saveClosure));
+  });
+}
+
+async function saveClosureRow(id) {
+  const rowEl = els.adminClosuresList?.querySelector(`[data-closure-id="${id}"]`);
+  if (!rowEl) return;
+  const label = rowEl.querySelector('[data-field="label"]')?.value?.trim();
+  const deduct_days = rowEl.querySelector('[data-field="deduct_days"]')?.value;
+  const btn = rowEl.querySelector("[data-save-closure]");
+  if (btn) {
+    btn.disabled = true;
+    btn.textContent = "Speichern…";
+  }
+  try {
+    await api("POST", { action: "update_closure", id, label, deduct_days });
+    toast("ROOTS-Tag gespeichert", "ok");
+    await loadClosures(closureYear);
+  } catch (e) {
+    toast(e.message || "Speichern fehlgeschlagen", "err");
+  } finally {
+    if (btn) {
+      btn.disabled = false;
+      btn.textContent = "Speichern";
+    }
+  }
 }
 
 async function refreshData() {
@@ -439,6 +509,11 @@ function bindUi() {
   els.rejectModal.addEventListener("click", (e) => {
     if (e.target === els.rejectModal) closeRejectModal();
   });
+  if (els.closureYear) {
+    els.closureYear.addEventListener("change", () => {
+      void loadClosures(Number(els.closureYear.value) || new Date().getFullYear());
+    });
+  }
 
   document.addEventListener("roots-profile-ready", () => void bootApp());
 }
@@ -464,6 +539,8 @@ function cacheEls() {
   els.adminPendingCount = document.getElementById("admin-pending-count");
   els.adminPendingList = document.getElementById("admin-pending-list");
   els.adminHistoryList = document.getElementById("admin-history-list");
+  els.adminClosuresList = document.getElementById("admin-closures-list");
+  els.closureYear = document.getElementById("closure-year");
   els.rejectModal = document.getElementById("reject-modal");
   els.rejectReason = document.getElementById("reject-reason");
   els.btnRejectConfirm = document.getElementById("btn-reject-confirm");

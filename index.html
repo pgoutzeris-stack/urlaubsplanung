@@ -155,6 +155,29 @@
 
     .admin-section { margin-bottom: 1.5rem; }
     .admin-section h3 { font-size: .92rem; font-weight: 700; margin-bottom: .75rem; color: var(--muted); text-transform: uppercase; letter-spacing: .04em; }
+    .closure-toolbar { display: flex; align-items: center; gap: .65rem; margin-bottom: .85rem; }
+    .closure-toolbar label { font-size: .85rem; font-weight: 600; color: var(--muted); }
+    .closure-toolbar select {
+      height: 38px; padding: 0 .75rem; border: 1px solid var(--line); border-radius: 10px;
+      font-family: inherit; font-size: .9rem; background: var(--bg); color: var(--ink);
+    }
+    .closure-list { display: flex; flex-direction: column; gap: .65rem; }
+    .closure-row {
+      display: grid; grid-template-columns: 7.5rem 1fr 5.5rem auto; gap: .65rem; align-items: center;
+      border: 1px solid var(--line); border-radius: 12px; padding: .75rem .85rem; background: var(--status-bg);
+    }
+    @media (max-width: 720px) { .closure-row { grid-template-columns: 1fr; } }
+    .closure-row-date { font-size: .88rem; font-weight: 700; color: var(--ink); }
+    .closure-row input[type="text"], .closure-row input[type="number"] {
+      width: 100%; height: 38px; padding: 0 .65rem; border: 1px solid var(--line); border-radius: 10px;
+      font-family: inherit; font-size: .88rem; background: var(--bg);
+    }
+    .closure-row-kind { font-size: .75rem; color: var(--muted); text-transform: uppercase; letter-spacing: .04em; }
+    .btn-closure-save {
+      height: 38px; padding: 0 .85rem; border: none; border-radius: 999px; background: var(--brand); color: #fff;
+      font-family: inherit; font-size: .82rem; font-weight: 600; cursor: pointer; white-space: nowrap;
+    }
+    .btn-closure-save:disabled { opacity: .55; cursor: not-allowed; }
     .empty-state { text-align: center; padding: 2rem 1rem; color: var(--muted); }
     .empty-state i { font-size: 2rem; opacity: .35; margin-bottom: .75rem; display: block; }
 
@@ -377,6 +400,17 @@
         <h3>Bearbeitet</h3>
         <div class="req-list" id="admin-history-list"></div>
       </div>
+      <div class="admin-section">
+        <h3>Betriebsferien &amp; ROOTS-Tage</h3>
+        <p style="color:var(--muted);margin-bottom:.85rem;font-size:.9rem;line-height:1.45;">
+          Verpflichtende freie Tage und Betriebsferien werden automatisch im Team-Kalender eingetragen und können dort nicht bearbeitet werden.
+        </p>
+        <div class="closure-toolbar">
+          <label for="closure-year">Jahr</label>
+          <select id="closure-year"></select>
+        </div>
+        <div class="closure-list" id="admin-closures-list"></div>
+      </div>
     </div>
   </div>
 </div>
@@ -408,7 +442,7 @@ window.RootsUser = window.RootsUser || {
     this._sb=sb;const{data:{session}}=await sb.auth.getSession();
     if(!session){this._uid=null;this._p=null;return;}
     this._uid=session.user.id;
-    const{data}=await sb.schema('users').from('profiles').select('id,email,full_name,position,avatar_url,linkedin_url,app_role,app_settings').eq('id',this._uid).single();
+    const{data}=await sb.schema('users').from('profiles').select('id,email,full_name,position,avatar_url,linkedin_url,app_role,app_settings,kuerzel').eq('id',this._uid).single();
     this._p=data||{id:this._uid,email:session.user.email,app_role:'reader'};this._mount();
   },
   _mount(){

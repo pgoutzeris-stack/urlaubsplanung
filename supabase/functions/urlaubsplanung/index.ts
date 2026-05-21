@@ -27,23 +27,35 @@ function json(data: unknown, status: number, c: Record<string, string>) {
   });
 }
 
+function deriveKuerzel(name: string, stored?: string | null): string {
+  const k = (stored || "").trim().toUpperCase();
+  if (k.length >= 2) return k.slice(0, 4);
+  const parts = name.trim().split(/\s+/).filter(Boolean);
+  if (parts.length >= 2) {
+    return (parts[0][0] + parts[parts.length - 1][0]).toUpperCase();
+  }
+  return (parts[0]?.slice(0, 2) || "??").toUpperCase();
+}
+
 async function ensureTeamMember(
   kal: ReturnType<typeof createClient>,
   userId: string,
   name: string,
+  kuerzel?: string | null,
 ) {
+  const kz = deriveKuerzel(name, kuerzel);
   const { data: byUser } = await kal
     .from("team_members")
-    .select("id,name,user_id")
+    .select("id,name,user_id,kuerzel")
     .eq("user_id", userId)
     .maybeSingle();
   if (byUser) {
-    if (byUser.name !== name) {
+    if (byUser.name !== name || byUser.kuerzel !== kz) {
       const { data: updated, error } = await kal
         .from("team_members")
-        .update({ name })
+        .update({ name, kuerzel: kz })
         .eq("id", byUser.id)
-        .select("id,name,user_id")
+        .select("id,name,user_id,kuerzel")
         .single();
       if (error) throw error;
       return updated;
@@ -59,10 +71,10 @@ async function ensureTeamMember(
   if (orphan) {
     const { data: linked, error } = await kal
       .from("team_members")
-      .update({ user_id: userId, name })
+      .update({ user_id: userId, name, kuerzel: kz })
       .eq("id", orphan.id)
       .is("user_id", null)
-      .select("id,name,user_id")
+      .select("id,name,user_id,kuerzel")
       .single();
     if (error) throw error;
     return linked;
@@ -70,15 +82,15 @@ async function ensureTeamMember(
   let insertName = name;
   let { data, error } = await kal
     .from("team_members")
-    .insert({ name: insertName, user_id: userId })
-    .select("id,name,user_id")
+    .insert({ name: insertName, user_id: userId, kuerzel: kz })
+    .select("id,name,user_id,kuerzel")
     .single();
   if (error?.code === "23505") {
     insertName = `${name} (${userId.slice(0, 8)})`;
     ({ data, error } = await kal
       .from("team_members")
-      .insert({ name: insertName, user_id: userId })
-      .select("id,name,user_id")
+      .insert({ name: insertName, user_id: userId, kuerzel: kz })
+      .select("id,name,user_id,kuerzel")
       .single());
   }
   if (error) throw error;
@@ -266,13 +278,13 @@ async function loadProfile(
   const profUsers = await service
     .schema("users")
     .from("profiles")
-    .select("id,full_name,email,app_role,urlaubstage")
+    .select("id,full_name,email,app_role,urlaubstage,kuerzel")
     .eq("id", userId)
     .maybeSingle();
   if (!profUsers.error) return profUsers;
   return service
     .from("profiles")
-    .select("id,full_name,email,app_role,urlaubstage")
+    .select("id,full_name,email,app_role,urlaubstage,kuerzel")
     .eq("id", userId)
     .maybeSingle();
 }
@@ -435,6 +447,17 @@ Deno.serve(async (req) => {
         if (error) throw error;
         return json((data ?? []).map((r) => rowOut(r as Record<string, unknown>)), 200, c);
       }
+      if (scope === "closures") {
+        if (!isAdmin) return json({ error: "Keine Berechtigung" }, 403, c);
+        const year = Number(params.get("year") || yearNow);
+        const { data, error } = await kalender
+          .from("roots_closure_days")
+          .select("id,closure_date,label,deduct_days,closure_kind,calendar_year")
+          .eq("calendar_year", year)
+          .order("closure_date");
+        if (error) throw error;
+        return json({ year, closures: data ?? [] }, 200, c);
+      }
       const { data, error } = await service
         .from("urlaub_requests")
         .select("*")
@@ -570,8 +593,10 @@ Deno.serve(async (req) => {
           kalender,
           reqRow.user_id as string,
           (reqRow.applicant_name as string) || displayName,
+          profile?.kuerzel,
         );
-        const title = `${member.name} Urlaub`;
+        const kz = deriveKuerzel(member.name, member.kuerzel);
+        const title = `${kz}: Urlaub`;
         const { data: ev, error: evErr } = await kalender
           .from("events")
           .insert({
@@ -581,6 +606,7 @@ Deno.serve(async (req) => {
             start_date: reqRow.start_date,
             end_date: reqRow.end_date,
             note: reqRow.note,
+            is_system: false,
           })
           .select("id")
           .single();
@@ -601,6 +627,34 @@ Deno.serve(async (req) => {
           .single();
         if (error) throw error;
         return json(rowOut(data as Record<string, unknown>), 200, c);
+      }
+
+      if (action === "update_closure") {
+        if (!isAdmin) return json({ error: "Keine Berechtigung" }, 403, c);
+        const id = String(body.id ?? "").trim();
+        if (!id) return json({ error: "id erforderlich" }, 400, c);
+        const label = body.label != null ? String(body.label).trim() : undefined;
+        const deductRaw = body.deduct_days;
+        const patch: Record<string, unknown> = {};
+        if (label != null && label.length > 0) patch.label = label;
+        if (deductRaw != null && deductRaw !== "") {
+          const d = Number(deductRaw);
+          if (!Number.isFinite(d) || d < 0 || d > 5) {
+            return json({ error: "deduct_days muss zwischen 0 und 5 liegen" }, 400, c);
+          }
+          patch.deduct_days = d;
+        }
+        if (!Object.keys(patch).length) {
+          return json({ error: "Keine Änderungen angegeben" }, 400, c);
+        }
+        const { data, error } = await kalender
+          .from("roots_closure_days")
+          .update(patch)
+          .eq("id", id)
+          .select("id,closure_date,label,deduct_days,closure_kind,calendar_year")
+          .single();
+        if (error) throw error;
+        return json(data, 200, c);
       }
 
       return json({ error: "Unbekannte Aktion" }, 400, c);
