@@ -228,9 +228,11 @@ function findRequestConflict(
   rows: Array<{ start_date: string; end_date: string; status: string }>,
   start: string,
   end: string,
+  excludeId?: string,
 ): string | null {
   for (const row of rows) {
     if (row.status !== "pending" && row.status !== "approved") continue;
+    if (excludeId && (row as { id?: string }).id === excludeId) continue;
     if (!rangesOverlap(start, end, row.start_date, row.end_date)) continue;
     const range = `${formatDeYmd(row.start_date)} – ${formatDeYmd(row.end_date)}`;
     if (row.status === "pending") {
@@ -239,6 +241,96 @@ function findRequestConflict(
     return `In diesem Zeitraum hast du bereits genehmigten Urlaub (${range}).`;
   }
   return null;
+}
+
+async function isClosureAutoRequest(
+  service: ReturnType<typeof createClient>,
+  requestId: string,
+): Promise<boolean> {
+  const { count, error } = await service
+    .from("roots_closure_assignments")
+    .select("id", { count: "exact", head: true })
+    .eq("urlaub_request_id", requestId);
+  if (error) throw error;
+  return (count ?? 0) > 0;
+}
+
+async function loadAdminIds(service: ReturnType<typeof createClient>): Promise<string[]> {
+  const { data, error } = await service
+    .schema("users")
+    .from("profiles")
+    .select("id")
+    .eq("app_role", "admin");
+  if (error) throw error;
+  return (data ?? []).map((r) => String(r.id));
+}
+
+async function notifyAdmins(
+  service: ReturnType<typeof createClient>,
+  payload: {
+    type: string;
+    title: string;
+    message: string;
+    meta?: Record<string, unknown>;
+  },
+) {
+  const adminIds = await loadAdminIds(service);
+  if (!adminIds.length) return;
+  const rows = adminIds.map((adminId) => ({
+    user_id: adminId,
+    type: payload.type,
+    title: payload.title,
+    message: payload.message,
+    session_id: null,
+    runde: null,
+    meta: {
+      ...(payload.meta ?? {}),
+      source: "urlaubsplanung",
+    },
+  }));
+  const { error } = await service.schema("recruiting").from("notifications").insert(rows);
+  if (error) console.error("[urlaubsplanung] notifyAdmins", error.message);
+}
+
+async function enrichRowOut(
+  service: ReturnType<typeof createClient>,
+  r: Record<string, unknown>,
+  viewerId: string,
+) {
+  const base = rowOut(r);
+  const isOwner = r.user_id === viewerId;
+  const status = String(r.status ?? "");
+  const isClosureAuto = r.id ? await isClosureAutoRequest(service, String(r.id)) : false;
+  return {
+    ...base,
+    can_withdraw: isOwner && status === "pending" && !isClosureAuto,
+    can_cancel: isOwner && status === "approved" && !isClosureAuto,
+    is_closure_auto: isClosureAuto,
+  };
+}
+
+async function refundUrlaubstage(
+  service: ReturnType<typeof createClient>,
+  userId: string,
+  days: number,
+) {
+  const { data, error } = await service
+    .schema("users")
+    .from("profiles")
+    .select("urlaubstage")
+    .eq("id", userId)
+    .single();
+  if (error) throw error;
+  const current = getUrlaubstage(data);
+  const { error: updErr } = await service
+    .schema("users")
+    .from("profiles")
+    .update({
+      urlaubstage: current + days,
+      updated_at: new Date().toISOString(),
+    })
+    .eq("id", userId);
+  if (updErr) throw updErr;
 }
 
 async function sumWorkingDaysForYear(
@@ -464,7 +556,10 @@ Deno.serve(async (req) => {
         .eq("user_id", user.id)
         .order("created_at", { ascending: false });
       if (error) throw error;
-      return json((data ?? []).map((r) => rowOut(r as Record<string, unknown>)), 200, c);
+      const enriched = await Promise.all(
+        (data ?? []).map((r) => enrichRowOut(service, r as Record<string, unknown>, user.id)),
+      );
+      return json(enriched, 200, c);
     }
 
     if (req.method === "POST") {
@@ -489,10 +584,11 @@ Deno.serve(async (req) => {
 
         const { data: mine, error: mineErr } = await service
           .from("urlaub_requests")
-          .select("start_date,end_date,status")
+          .select("id,start_date,end_date,status")
           .eq("user_id", user.id);
         if (mineErr) throw mineErr;
         const rows = (mine ?? []) as Array<{
+          id: string;
           start_date: string;
           end_date: string;
           status: string;
@@ -535,7 +631,128 @@ Deno.serve(async (req) => {
           .select("*")
           .single();
         if (error) throw error;
-        return json(rowOut(data as Record<string, unknown>), 201, c);
+        return json(await enrichRowOut(service, data as Record<string, unknown>, user.id), 201, c);
+      }
+
+      if (action === "withdraw") {
+        const id = String(body.id ?? "").trim();
+        if (!id) return json({ error: "id erforderlich" }, 400, c);
+
+        const { data: reqRow, error: loadErr } = await service
+          .from("urlaub_requests")
+          .select("*")
+          .eq("id", id)
+          .maybeSingle();
+        if (loadErr) throw loadErr;
+        if (!reqRow) return json({ error: "Antrag nicht gefunden" }, 404, c);
+        if (reqRow.user_id !== user.id) {
+          return json({ error: "Keine Berechtigung" }, 403, c);
+        }
+        if (reqRow.status !== "pending") {
+          return json({ error: "Nur ausstehende Anträge können zurückgezogen werden" }, 409, c);
+        }
+        if (await isClosureAutoRequest(service, id)) {
+          return json({ error: "Dieser Eintrag kann nicht zurückgezogen werden" }, 403, c);
+        }
+
+        const { data, error } = await service
+          .from("urlaub_requests")
+          .update({
+            status: "withdrawn",
+            updated_at: new Date().toISOString(),
+          })
+          .eq("id", id)
+          .select("*")
+          .single();
+        if (error) throw error;
+
+        const applicant = (reqRow.applicant_name as string) || displayName;
+        await notifyAdmins(service, {
+          type: "urlaub_withdrawn",
+          title: "Urlaubsantrag zurückgezogen",
+          message: `${applicant} hat den Antrag ${formatDeYmd(reqRow.start_date as string)} – ${formatDeYmd(reqRow.end_date as string)} zurückgezogen.`,
+          meta: { request_id: id, user_id: user.id, applicant_name: applicant },
+        });
+        return json(await enrichRowOut(service, data as Record<string, unknown>, user.id), 200, c);
+      }
+
+      if (action === "cancel_approved") {
+        const id = String(body.id ?? "").trim();
+        if (!id) return json({ error: "id erforderlich" }, 400, c);
+
+        const { data: reqRow, error: loadErr } = await service
+          .from("urlaub_requests")
+          .select("*")
+          .eq("id", id)
+          .maybeSingle();
+        if (loadErr) throw loadErr;
+        if (!reqRow) return json({ error: "Antrag nicht gefunden" }, 404, c);
+        if (reqRow.user_id !== user.id) {
+          return json({ error: "Keine Berechtigung" }, 403, c);
+        }
+        if (reqRow.status !== "approved") {
+          return json({ error: "Nur genehmigter Urlaub kann storniert werden" }, 409, c);
+        }
+        if (await isClosureAutoRequest(service, id)) {
+          return json(
+            { error: "Betriebsferien und ROOTS-Tage können nicht storniert werden" },
+            403,
+            c,
+          );
+        }
+
+        const eventId = reqRow.calendar_event_id as string | null;
+        if (eventId) {
+          const { data: evRow, error: evErr } = await kalender
+            .from("events")
+            .select("id,is_system")
+            .eq("id", eventId)
+            .maybeSingle();
+          if (evErr) throw evErr;
+          if (evRow?.is_system) {
+            return json(
+              { error: "Betriebsferien und ROOTS-Tage können nicht storniert werden" },
+              403,
+              c,
+            );
+          }
+          const { error: delErr } = await kalender.from("events").delete().eq("id", eventId);
+          if (delErr) throw delErr;
+        }
+
+        const refundDays = countWorkingDaysInRange(
+          reqRow.start_date as string,
+          reqRow.end_date as string,
+          await loadHolidayMap(
+            kalender,
+            reqRow.start_date as string,
+            reqRow.end_date as string,
+          ),
+        );
+        if (refundDays > 0) {
+          await refundUrlaubstage(service, user.id, refundDays);
+        }
+
+        const { data, error } = await service
+          .from("urlaub_requests")
+          .update({
+            status: "cancelled",
+            calendar_event_id: null,
+            updated_at: new Date().toISOString(),
+          })
+          .eq("id", id)
+          .select("*")
+          .single();
+        if (error) throw error;
+
+        const applicant = (reqRow.applicant_name as string) || displayName;
+        await notifyAdmins(service, {
+          type: "urlaub_cancelled",
+          title: "Genehmigter Urlaub storniert",
+          message: `${applicant} hat genehmigten Urlaub ${formatDeYmd(reqRow.start_date as string)} – ${formatDeYmd(reqRow.end_date as string)} storniert. Der Kalendereintrag wurde entfernt.`,
+          meta: { request_id: id, user_id: user.id, applicant_name: applicant },
+        });
+        return json(await enrichRowOut(service, data as Record<string, unknown>, user.id), 200, c);
       }
 
       if (action === "approve" || action === "reject") {

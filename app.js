@@ -4,6 +4,8 @@ const STATUS = {
   pending: { label: "Ausstehend", cls: "status--pending", icon: "fa-clock" },
   approved: { label: "Genehmigt", cls: "status--approved", icon: "fa-circle-check" },
   rejected: { label: "Abgelehnt", cls: "status--rejected", icon: "fa-circle-xmark" },
+  withdrawn: { label: "Zurückgezogen", cls: "status--withdrawn", icon: "fa-rotate-left" },
+  cancelled: { label: "Storniert", cls: "status--cancelled", icon: "fa-ban" },
 };
 
 let sb = null;
@@ -320,7 +322,7 @@ function updateStats() {
   els.adminPendingCount.textContent = String(requests.filter((r) => r.status === "pending").length);
 }
 
-function renderRequestCard(r, { showActions = false } = {}) {
+function renderRequestCard(r, { showActions = false, showUserActions = false } = {}) {
   const st = STATUS[r.status] || STATUS.pending;
   const days = countWorkingDays(r.start_date, r.end_date);
   const dayLabel = days === 1 ? "Urlaubstag" : "Urlaubstage";
@@ -331,6 +333,16 @@ function renderRequestCard(r, { showActions = false } = {}) {
           <button type="button" class="btn-reject" data-reject="${r.id}"><i class="fa-solid fa-xmark"></i> Ablehnen</button>
         </div>`
       : "";
+  const userActions =
+    showUserActions && r.can_withdraw
+      ? `<div class="req-actions">
+          <button type="button" class="btn-withdraw" data-withdraw="${r.id}"><i class="fa-solid fa-rotate-left"></i> Zurückziehen</button>
+        </div>`
+      : showUserActions && r.can_cancel
+        ? `<div class="req-actions">
+            <button type="button" class="btn-cancel-vacation" data-cancel-vacation="${r.id}"><i class="fa-solid fa-trash-can"></i> Urlaub stornieren</button>
+          </div>`
+        : "";
   const rejectNote =
     r.status === "rejected" && r.rejection_reason
       ? `<p class="req-reject-reason"><i class="fa-solid fa-comment"></i> ${escapeHtml(r.rejection_reason)}</p>`
@@ -352,6 +364,7 @@ function renderRequestCard(r, { showActions = false } = {}) {
     ${rejectNote}
     ${calNote}
     ${actions}
+    ${userActions}
   </article>`;
 }
 
@@ -370,8 +383,9 @@ function renderLists() {
   }
 
   els.myList.innerHTML = requests.length
-    ? requests.map((r) => renderRequestCard(r)).join("")
+    ? requests.map((r) => renderRequestCard(r, { showUserActions: true })).join("")
     : `<div class="empty-state"><i class="fa-solid fa-umbrella-beach"></i><p>Noch keine Urlaubsanträge – reiche deinen ersten Antrag ein.</p></div>`;
+  bindUserActions(els.myList);
 }
 
 function bindAdminActions(root) {
@@ -381,6 +395,38 @@ function bindAdminActions(root) {
   root.querySelectorAll("[data-reject]").forEach((btn) => {
     btn.addEventListener("click", () => openRejectModal(btn.dataset.reject));
   });
+}
+
+function bindUserActions(root) {
+  if (!root) return;
+  root.querySelectorAll("[data-withdraw]").forEach((btn) => {
+    btn.addEventListener("click", () => void handleWithdraw(btn.dataset.withdraw));
+  });
+  root.querySelectorAll("[data-cancel-vacation]").forEach((btn) => {
+    btn.addEventListener("click", () => void handleCancelApproved(btn.dataset.cancelVacation));
+  });
+}
+
+async function handleWithdraw(id) {
+  if (!confirm("Ausstehenden Urlaubsantrag wirklich zurückziehen?")) return;
+  try {
+    await api("POST", { action: "withdraw", id });
+    toast("Antrag zurückgezogen", "ok");
+    await refreshData();
+  } catch (e) {
+    toast(e.message || "Zurückziehen fehlgeschlagen", "err");
+  }
+}
+
+async function handleCancelApproved(id) {
+  if (!confirm("Genehmigten Urlaub wirklich stornieren? Der Kalendereintrag wird entfernt und die Urlaubstage werden wieder gutgeschrieben.")) return;
+  try {
+    await api("POST", { action: "cancel_approved", id });
+    toast("Urlaub storniert", "ok");
+    await refreshData();
+  } catch (e) {
+    toast(e.message || "Stornierung fehlgeschlagen", "err");
+  }
 }
 
 async function handleApprove(id) {
@@ -444,12 +490,10 @@ async function handleSubmit(e) {
     return;
   }
 
-  if (!isAdmin) {
-    const conflict = findLocalConflict(start, end);
-    if (conflict) {
-      toast(conflict, "err");
-      return;
-    }
+  const conflict = findLocalConflict(start, end);
+  if (conflict) {
+    toast(conflict, "err");
+    return;
   }
 
   const btn = els.btnSubmit;

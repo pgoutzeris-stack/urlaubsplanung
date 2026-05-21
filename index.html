@@ -143,8 +143,10 @@
     .status--pending { background: var(--warn-light); color: #b45309; }
     .status--approved { background: var(--success-light); color: var(--success); }
     .status--rejected { background: var(--danger-light); color: var(--danger); }
+    .status--withdrawn { background: #f1f5f9; color: #64748b; }
+    .status--cancelled { background: #fef3c7; color: #b45309; }
     .req-actions { display: flex; flex-wrap: wrap; gap: .5rem; margin-top: .85rem; }
-    .btn-approve, .btn-reject {
+    .btn-approve, .btn-reject, .btn-withdraw, .btn-cancel-vacation {
       display: inline-flex; align-items: center; gap: 6px; padding: .55rem 1rem;
       border-radius: 999px; font-family: inherit; font-size: .85rem; font-weight: 600; cursor: pointer; border: none;
     }
@@ -152,6 +154,13 @@
     .btn-approve:hover { filter: brightness(1.05); }
     .btn-reject { background: var(--bg); border: 1px solid var(--line); color: var(--ink); }
     .btn-reject:hover { border-color: var(--danger); color: var(--danger); }
+    .btn-withdraw, .btn-cancel-vacation {
+      display: inline-flex; align-items: center; gap: 6px; padding: .55rem 1rem;
+      border-radius: 999px; font-family: inherit; font-size: .85rem; font-weight: 600; cursor: pointer;
+      background: var(--bg); border: 1px solid var(--line); color: var(--ink);
+    }
+    .btn-withdraw:hover { border-color: var(--brand); color: var(--brand); }
+    .btn-cancel-vacation:hover { border-color: var(--danger); color: var(--danger); }
 
     .admin-section { margin-bottom: 1.5rem; }
     .admin-section h3 { font-size: .92rem; font-weight: 700; margin-bottom: .75rem; color: var(--muted); text-transform: uppercase; letter-spacing: .04em; }
