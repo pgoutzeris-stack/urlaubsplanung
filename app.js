@@ -184,16 +184,28 @@ async function loadHolidays(year = new Date().getFullYear()) {
 async function refreshRole() {
   const ru = await waitForProfile();
   if (!ru) throw new Error("Profil nicht geladen");
-  isAdmin = Boolean(window.RootsUser?.isAdmin?.());
+  isAdmin = window.RootsUser?._p?.app_role === "admin";
   els.adminPanel.hidden = !isAdmin;
   els.userPanel.hidden = isAdmin;
-  if (els.btnAdminSettings) els.btnAdminSettings.hidden = !isAdmin;
+  syncAdminSettingsButton();
   if (els.userBadge) els.userBadge.hidden = isAdmin;
   if (els.adminBadge) els.adminBadge.hidden = !isAdmin;
   if (els.greetingDesc) {
     els.greetingDesc.textContent = isAdmin
       ? "Prüfe offene Urlaubsanträge und behalte Urlaubskontingente im Blick. Über „Admin-Einstellungen“ oben rechts kannst du Betriebsferien und freie Tage verwalten."
       : "Reiche hier deinen Urlaub ein. Nach der Freigabe durch einen Admin wird er automatisch im Team-Kalender eingetragen. Wochenenden und Feiertage sind nicht möglich.";
+  }
+}
+
+function syncAdminSettingsButton() {
+  const btn = els.btnAdminSettings;
+  if (!btn) return;
+  const show = isAdmin === true;
+  btn.hidden = !show;
+  btn.classList.toggle("is-admin-visible", show);
+  btn.setAttribute("aria-hidden", show ? "false" : "true");
+  if (!show && els.adminSettingsModal?.classList.contains("is-open")) {
+    closeAdminSettingsModal();
   }
 }
 
@@ -607,6 +619,8 @@ function showDashboard() {
 
 function showLogin() {
   stopAutoRefresh();
+  isAdmin = false;
+  syncAdminSettingsButton();
   els.dashboard.style.display = "none";
   document.getElementById("screen-login").style.display = "flex";
   document.body.classList.remove("body-dashboard");
@@ -658,6 +672,10 @@ function bindUi() {
   }
 
   document.addEventListener("roots-profile-ready", () => void bootApp());
+
+  window.onRootsTeamRefresh = () => {
+    void refreshRole().then(() => loadRequests()).catch(() => {});
+  };
 }
 
 function cacheEls() {
@@ -708,5 +726,6 @@ export function initApp(client) {
   const today = new Date().toISOString().slice(0, 10);
   els.fStart.value = today;
   els.fEnd.value = today;
+  syncAdminSettingsButton();
   if (isProfileReady()) void bootApp();
 }

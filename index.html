@@ -93,12 +93,14 @@
     .header-sub { font-size: 12px; color: var(--muted); }
     .header-right { display: flex; align-items: center; gap: 14px; }
     .btn-header-settings {
-      display: inline-flex; align-items: center; gap: .55rem; height: 38px;
+      display: none; align-items: center; gap: .55rem; height: 38px;
       padding: 0 1.05rem 0 .9rem; margin-right: .25rem; border-radius: 999px;
       border: 1px solid var(--line); background: var(--bg); cursor: pointer;
       font-family: inherit; font-size: .84rem; font-weight: 600; color: var(--ink);
       transition: all .2s; white-space: nowrap;
     }
+    .btn-header-settings.is-admin-visible { display: inline-flex; }
+    .btn-header-settings[hidden] { display: none !important; }
     .btn-header-settings i { color: var(--brand); font-size: .95rem; }
     .btn-header-settings:hover { border-color: var(--brand); background: var(--brand-light); }
     @media (max-width: 720px) {
