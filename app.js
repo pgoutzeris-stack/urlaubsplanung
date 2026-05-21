@@ -187,14 +187,26 @@ async function refreshRole() {
   isAdmin = window.RootsUser?._p?.app_role === "admin";
   els.adminPanel.hidden = !isAdmin;
   els.userPanel.hidden = isAdmin;
+  if (els.navUser) els.navUser.hidden = isAdmin;
+  if (els.navAdmin) els.navAdmin.hidden = !isAdmin;
   syncAdminSettingsButton();
+  setActiveNav(isAdmin ? "admin" : "user");
   if (els.userBadge) els.userBadge.hidden = isAdmin;
   if (els.adminBadge) els.adminBadge.hidden = !isAdmin;
   if (els.greetingDesc) {
     els.greetingDesc.textContent = isAdmin
-      ? "Prüfe offene Urlaubsanträge und behalte Urlaubskontingente im Blick. Über „Admin-Einstellungen“ oben rechts kannst du Betriebsferien und freie Tage verwalten."
+      ? "Prüfe offene Urlaubsanträge und behalte Urlaubskontingente im Blick. Betriebsferien und freie Tage verwaltest du unter „Einstellungen“ in der Sidebar."
       : "Reiche hier deinen Urlaub ein. Nach der Freigabe durch einen Admin wird er automatisch im Team-Kalender eingetragen. Wochenenden und Feiertage sind nicht möglich.";
   }
+}
+
+function setActiveNav(view) {
+  const titles = { user: "Mein Urlaub", admin: "Freigaben" };
+  if (els.dashViewTitle) els.dashViewTitle.textContent = titles[view] || titles.user;
+  [els.navUser, els.navAdmin].forEach((btn) => {
+    if (!btn || btn.hidden) return;
+    btn.classList.toggle("active", btn.dataset.view === view);
+  });
 }
 
 function syncAdminSettingsButton() {
@@ -202,7 +214,6 @@ function syncAdminSettingsButton() {
   if (!btn) return;
   const show = isAdmin === true;
   btn.hidden = !show;
-  btn.classList.toggle("is-admin-visible", show);
   btn.setAttribute("aria-hidden", show ? "false" : "true");
   if (!show && els.adminSettingsModal?.classList.contains("is-open")) {
     closeAdminSettingsModal();
@@ -610,7 +621,7 @@ async function handleSubmit(e) {
 
 function showDashboard() {
   document.getElementById("screen-login").style.display = "none";
-  els.dashboard.style.display = "block";
+  els.dashboard.style.display = "flex";
   document.body.classList.add("body-dashboard");
   const name = window.RootsUser?._p?.full_name?.split(" ")[0] || "du";
   els.greeting.textContent = `Hallo, ${name}!`;
@@ -657,6 +668,20 @@ function bindUi() {
   if (els.btnAdminSettings) {
     els.btnAdminSettings.addEventListener("click", () => void openAdminSettingsModal());
   }
+  if (els.navUser) {
+    els.navUser.addEventListener("click", () => {
+      if (isAdmin) return;
+      setActiveNav("user");
+    });
+  }
+  if (els.navAdmin) {
+    els.navAdmin.addEventListener("click", () => {
+      if (!isAdmin) return;
+      els.adminPanel.hidden = false;
+      els.userPanel.hidden = true;
+      setActiveNav("admin");
+    });
+  }
   if (els.btnAdminSettingsClose) {
     els.btnAdminSettingsClose.addEventListener("click", closeAdminSettingsModal);
   }
@@ -693,6 +718,9 @@ function cacheEls() {
   els.statApproved = document.getElementById("stat-approved");
   els.userPanel = document.getElementById("user-panel");
   els.adminPanel = document.getElementById("admin-panel");
+  els.navUser = document.getElementById("nav-user");
+  els.navAdmin = document.getElementById("nav-admin");
+  els.dashViewTitle = document.getElementById("dash-view-title");
   els.userBadge = document.getElementById("user-badge");
   els.greetingDesc = document.getElementById("greeting-desc");
   els.adminBadge = document.getElementById("admin-badge");

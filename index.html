@@ -32,10 +32,10 @@
     }
     *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
     html, body {
-      min-height: 100%; font-family: 'Circular Std', system-ui, sans-serif;
+      height: 100%; font-family: 'Circular Std', system-ui, sans-serif;
       color: var(--ink); background: var(--status-bg); -webkit-font-smoothing: antialiased;
     }
-    body.body-dashboard { background: var(--app-bg); }
+    body.body-dashboard { background: var(--app-bg); overflow: hidden; }
 
     /* Login */
     #screen-login {
@@ -75,47 +75,67 @@
     .alert.visible { display: flex; }
     .alert-error { background: var(--status-bg); border-left: 4px solid var(--ink); }
 
-    /* Dashboard shell */
-    #screen-dashboard { display: none; min-height: 100vh; }
-    #screen-dashboard .sop-header, #screen-dashboard .dash-main {
-      width: var(--app-shell-w); max-width: var(--app-max-w); margin-left: auto; margin-right: auto;
+    /* Dashboard shell (Notes-Tool Layout) */
+    #screen-dashboard {
+      display: none; position: fixed; inset: 0; width: 100%; height: 100%;
+      flex-direction: column; overflow: hidden; background: var(--app-bg); z-index: 10;
     }
     .sop-header {
       display: flex; align-items: center; justify-content: space-between;
-      padding: .8rem 1.5rem; min-height: 64px; background: var(--bg); border: 1px solid var(--line);
-      border-radius: var(--radius); box-shadow: var(--shadow); gap: 14px; margin: 1rem auto 1rem;
+      padding: 0.8rem 1.5rem; min-height: 64px;
+      background: var(--bg); border-bottom: 1px solid var(--line);
+      gap: 14px; flex-shrink: 0; position: relative; z-index: 50;
+      box-shadow: 0 2px 8px rgba(15,23,42,.04);
     }
     .header-left { display: flex; align-items: center; gap: 10px; flex: 1; min-width: 0; }
     .logo-mark { width: 28px; height: 28px; border-radius: 7px; background: var(--brand); display: flex; align-items: center; justify-content: center; flex-shrink: 0; }
     .wordmark { font-size: 14px; font-weight: 700; color: var(--ink); white-space: nowrap; }
     .wordmark span { color: var(--brand); }
-    .header-divider { width: 1px; height: 16px; background: var(--line); }
-    .header-sub { font-size: 12px; color: var(--muted); }
-    .header-right { display: flex; align-items: center; gap: 14px; }
-    .btn-header-settings {
-      display: none; align-items: center; gap: .55rem; height: 38px;
-      padding: 0 1.05rem 0 .9rem; margin-right: .25rem; border-radius: 999px;
-      border: 1px solid var(--line); background: var(--bg); cursor: pointer;
-      font-family: inherit; font-size: .84rem; font-weight: 600; color: var(--ink);
-      transition: all .2s; white-space: nowrap;
-    }
-    .btn-header-settings.is-admin-visible { display: inline-flex; }
-    .btn-header-settings[hidden] { display: none !important; }
-    .btn-header-settings i { color: var(--brand); font-size: .95rem; }
-    .btn-header-settings:hover { border-color: var(--brand); background: var(--brand-light); }
-    @media (max-width: 720px) {
-      .btn-header-settings span { display: none; }
-      .btn-header-settings { padding: 0 .75rem; margin-right: 0; }
-    }
-    .dash-avatar { width: 32px; height: 32px; border-radius: 50%; background: var(--brand-light); color: var(--brand); display: flex; align-items: center; justify-content: center; font-weight: 700; font-size: .8rem; }
+    .header-divider { width: 1px; height: 16px; background: var(--line); flex-shrink: 0; }
+    .header-sub { font-size: 12px; color: var(--muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .header-right { display: flex; align-items: center; gap: 8px; flex-shrink: 0; }
+    .dash-avatar { width: 32px; height: 32px; border-radius: 50%; background: var(--brand-light); color: var(--brand); display: flex; align-items: center; justify-content: center; font-weight: 700; font-size: .8rem; flex-shrink: 0; overflow: hidden; }
     .role-badge {
       font-size: .72rem; font-weight: 700; text-transform: uppercase; letter-spacing: .05em;
       padding: .35rem .65rem; border-radius: 999px; background: var(--brand-light); color: var(--brand);
     }
     .role-badge--admin { background: var(--warn-light); color: #b45309; }
-
-    .dash-main { padding: 0 0 4rem; animation: fadeIn .35s ease; }
+    .dash-body { display: flex; flex: 1; min-height: 0; overflow: hidden; }
+    .dash-sidebar {
+      width: 260px; background: var(--bg); border-right: 1px solid var(--line);
+      display: flex; flex-direction: column; flex-shrink: 0;
+    }
+    .dash-nav { padding: 1rem .75rem; flex: 1; overflow-y: auto; }
+    .dash-nav-item {
+      display: flex; align-items: center; gap: 10px; padding: .65rem .85rem; border-radius: 10px;
+      cursor: pointer; font-size: .92rem; color: var(--muted); font-weight: 500; margin-bottom: 2px;
+      transition: all .15s; border: none; background: none; width: 100%; text-align: left; font-family: inherit;
+    }
+    .dash-nav-item[hidden] { display: none !important; }
+    .dash-nav-item:hover { background: var(--brand-light); color: var(--brand); }
+    .dash-nav-item.active { background: var(--brand-light); color: var(--brand); font-weight: 600; }
+    .dash-nav-item i { width: 18px; font-size: 1rem; text-align: center; flex-shrink: 0; }
+    .dash-nav-section {
+      font-size: .68rem; font-weight: 700; color: var(--muted); text-transform: uppercase;
+      letter-spacing: .08em; padding: .75rem .85rem .35rem;
+    }
+    .dash-main { flex: 1; display: flex; flex-direction: column; min-width: 0; overflow: hidden; animation: fadeIn .35s ease; }
+    .dash-toolbar {
+      padding: 1rem 2rem; border-bottom: 1px solid var(--line); background: var(--bg);
+      display: flex; align-items: center; gap: 1rem; flex-shrink: 0; flex-wrap: wrap;
+    }
+    .dash-title { font-size: 1.25rem; font-weight: 700; flex: 1; margin: 0; min-width: 140px; }
+    .dash-content { flex: 1; overflow-y: auto; padding: 1.5rem 2rem 3rem; }
     @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
+    @media (max-width: 900px) {
+      .dash-sidebar { width: 220px; }
+      .dash-toolbar, .dash-content { padding-left: 1rem; padding-right: 1rem; }
+    }
+    @media (max-width: 768px) {
+      .sop-header { min-height: 56px; flex-wrap: wrap; }
+      .header-left { width: 100%; }
+      .header-right { width: 100%; justify-content: flex-end; }
+    }
     .greeting { margin-bottom: 1.75rem; }
     .greeting h1 { font-size: 1.75rem; font-weight: 700; margin-bottom: .35rem; }
     .greeting p { color: var(--muted); font-size: 1rem; line-height: 1.55; max-width: 52rem; }
@@ -425,30 +445,46 @@
 
 <!-- Dashboard -->
 <div id="screen-dashboard">
-  <header class="sop-header">
+  <header class="sop-header" role="banner">
     <div class="header-left">
       <div class="logo-mark" aria-hidden="true">
         <svg viewBox="0 0 16 16" fill="none" width="16" height="16"><rect x="2" y="2" width="5" height="5" rx="1.5" fill="white" opacity=".9"/><rect x="9" y="2" width="5" height="5" rx="1.5" fill="white" opacity=".6"/><rect x="2" y="9" width="5" height="5" rx="1.5" fill="white" opacity=".6"/><rect x="9" y="9" width="5" height="5" rx="1.5" fill="white" opacity=".3"/></svg>
       </div>
       <span class="wordmark">ROOTS <span>URLAUB</span></span>
-      <div class="header-divider"></div>
+      <div class="header-divider" aria-hidden="true"></div>
       <span class="header-sub">Urlaub einreichen &amp; freigeben</span>
     </div>
     <div class="header-right">
-      <button type="button" class="btn-header-settings" id="btn-admin-settings" hidden title="Admin-Einstellungen" aria-label="Admin-Einstellungen">
-        <i class="fa-solid fa-gear" aria-hidden="true"></i>
-        <span>Admin-Einstellungen</span>
-      </button>
       <div class="dash-avatar" id="user-avatar" style="cursor:pointer" title="Profil"></div>
       <span id="user-name-topbar" class="header-sub"></span>
     </div>
   </header>
 
-  <div class="dash-main">
-    <div class="greeting">
-      <h1 id="greeting-text">Hallo!</h1>
-      <p id="greeting-desc">Reiche hier deinen Urlaub ein. Nach der Freigabe durch einen Admin wird er automatisch im Team-Kalender eingetragen.</p>
-    </div>
+  <div class="dash-body">
+    <aside class="dash-sidebar">
+      <nav class="dash-nav">
+        <div class="dash-nav-section">Navigation</div>
+        <button type="button" class="dash-nav-item active" id="nav-user" data-view="user">
+          <i class="fa-solid fa-umbrella-beach"></i> Mein Urlaub
+        </button>
+        <button type="button" class="dash-nav-item" id="nav-admin" data-view="admin" hidden>
+          <i class="fa-solid fa-inbox"></i> Freigaben
+        </button>
+        <button type="button" class="dash-nav-item" id="btn-admin-settings" hidden title="Admin-Einstellungen">
+          <i class="fa-solid fa-gear"></i> Einstellungen
+        </button>
+      </nav>
+    </aside>
+
+    <main class="dash-main">
+      <div class="dash-toolbar">
+        <h1 class="dash-title" id="dash-view-title">Mein Urlaub</h1>
+      </div>
+      <div class="dash-content">
+        <div class="greeting">
+          <h1 id="greeting-text">Hallo!</h1>
+          <p id="greeting-desc">Reiche hier deinen Urlaub ein. Nach der Freigabe durch einen Admin wird er automatisch im Team-Kalender eingetragen.</p>
+        </div>
 
     <!-- User view -->
     <div id="user-panel">
@@ -520,6 +556,8 @@
         <div class="req-list" id="admin-history-list"></div>
       </div>
     </div>
+      </div>
+    </main>
   </div>
 </div>
 
