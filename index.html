@@ -91,13 +91,20 @@
     .wordmark span { color: var(--brand); }
     .header-divider { width: 1px; height: 16px; background: var(--line); }
     .header-sub { font-size: 12px; color: var(--muted); }
-    .header-right { display: flex; align-items: center; gap: 8px; }
-    .btn-header-gear {
-      width: 36px; height: 36px; border-radius: 10px; border: 1px solid var(--line);
-      background: var(--bg); color: var(--muted); cursor: pointer; display: inline-flex;
-      align-items: center; justify-content: center; font-size: .95rem; transition: all .2s;
+    .header-right { display: flex; align-items: center; gap: 14px; }
+    .btn-header-settings {
+      display: inline-flex; align-items: center; gap: .55rem; height: 38px;
+      padding: 0 1.05rem 0 .9rem; margin-right: .25rem; border-radius: 999px;
+      border: 1px solid var(--line); background: var(--bg); cursor: pointer;
+      font-family: inherit; font-size: .84rem; font-weight: 600; color: var(--ink);
+      transition: all .2s; white-space: nowrap;
     }
-    .btn-header-gear:hover { border-color: var(--brand); color: var(--brand); background: var(--brand-light); }
+    .btn-header-settings i { color: var(--brand); font-size: .95rem; }
+    .btn-header-settings:hover { border-color: var(--brand); background: var(--brand-light); }
+    @media (max-width: 720px) {
+      .btn-header-settings span { display: none; }
+      .btn-header-settings { padding: 0 .75rem; margin-right: 0; }
+    }
     .dash-avatar { width: 32px; height: 32px; border-radius: 50%; background: var(--brand-light); color: var(--brand); display: flex; align-items: center; justify-content: center; font-weight: 700; font-size: .8rem; }
     .role-badge {
       font-size: .72rem; font-weight: 700; text-transform: uppercase; letter-spacing: .05em;
@@ -128,8 +135,10 @@
       background: var(--bg); border-radius: var(--radius-dash); padding: 1.35rem 1.5rem;
       box-shadow: var(--shadow-dash); border: 1px solid var(--line);
     }
-    .panel-title { font-size: 1.05rem; font-weight: 700; margin-bottom: 1rem; display: flex; align-items: center; gap: .5rem; }
+    .panel-title { font-size: 1.05rem; font-weight: 700; margin-bottom: .45rem; display: flex; align-items: center; gap: .5rem; }
     .panel-title i { color: var(--brand); }
+    .panel-desc { color: var(--muted); font-size: .88rem; line-height: 1.5; margin-bottom: 1rem; max-width: 36rem; }
+    .panel-desc strong { color: var(--ink); font-weight: 700; }
     .date-row { display: grid; grid-template-columns: 1fr 1fr; gap: .75rem; }
     .form-actions { margin-top: 1.25rem; }
 
@@ -179,16 +188,24 @@
     }
     .closure-list { display: flex; flex-direction: column; gap: .65rem; }
     .closure-row {
-      display: grid; grid-template-columns: 7.5rem 1fr 5.5rem auto; gap: .65rem; align-items: center;
+      display: grid; grid-template-columns: 7.5rem 1fr 7rem 6.5rem; gap: .65rem; align-items: center;
       border: 1px solid var(--line); border-radius: 12px; padding: .75rem .85rem; background: var(--status-bg);
     }
     @media (max-width: 720px) { .closure-row { grid-template-columns: 1fr; } }
-    .closure-row-date { font-size: .88rem; font-weight: 700; color: var(--ink); }
+    .closure-row-date { font-size: .88rem; font-weight: 700; color: var(--ink); line-height: 1.35; }
+    .closure-row-badge {
+      display: inline-flex; margin-top: .2rem; padding: .15rem .45rem; border-radius: 999px;
+      background: var(--brand-light); color: var(--brand); font-size: .68rem; font-weight: 700;
+    }
     .closure-row input[type="text"], .closure-row input[type="number"] {
       width: 100%; height: 38px; padding: 0 .65rem; border: 1px solid var(--line); border-radius: 10px;
       font-family: inherit; font-size: .88rem; background: var(--bg);
     }
-    .closure-row-kind { font-size: .75rem; color: var(--muted); text-transform: uppercase; letter-spacing: .04em; }
+    .closure-field-label {
+      display: none; font-size: .72rem; font-weight: 700; color: var(--muted); margin-bottom: .25rem;
+      text-transform: uppercase; letter-spacing: .04em;
+    }
+    @media (max-width: 720px) { .closure-field-label { display: block; } }
     .btn-closure-save {
       height: 38px; padding: 0 .85rem; border: none; border-radius: 999px; background: var(--brand); color: #fff;
       font-family: inherit; font-size: .82rem; font-weight: 600; cursor: pointer; white-space: nowrap;
@@ -207,38 +224,60 @@
       font-size: .72rem; font-weight: 800; letter-spacing: .03em;
     }
     .team-row-title { font-size: .92rem; font-weight: 700; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-    .team-row-main { font-size: .88rem; font-weight: 700; color: var(--brand); white-space: nowrap; }
+    .team-row-main { font-size: .86rem; font-weight: 700; color: var(--brand); white-space: nowrap; text-align: right; line-height: 1.35; }
+    .team-row-main small { display: block; font-size: .72rem; font-weight: 600; color: var(--muted); }
     .team-row-sub { font-size: .78rem; color: var(--muted); margin-top: .2rem; }
     .team-progress { height: 6px; border-radius: 999px; background: var(--line); overflow: hidden; margin-top: .55rem; }
     .team-progress > span { display: block; height: 100%; border-radius: 999px; background: linear-gradient(90deg, var(--brand), #60a5fa); }
 
-    .staff-settings-list { display: flex; flex-direction: column; gap: .65rem; max-height: 340px; overflow-y: auto; }
+    .settings-hint {
+      display: flex; gap: .75rem; align-items: flex-start; padding: .9rem 1rem; margin-bottom: 1.1rem;
+      border-radius: 12px; background: var(--brand-light); border: 1px solid rgba(32,110,251,.15);
+      color: var(--ink); font-size: .88rem; line-height: 1.5;
+    }
+    .settings-hint i { color: var(--brand); margin-top: .15rem; flex-shrink: 0; }
+    .settings-table-head {
+      display: grid; gap: .65rem; padding: 0 .85rem .45rem;
+      font-size: .72rem; font-weight: 700; color: var(--muted); text-transform: uppercase; letter-spacing: .04em;
+    }
+    .settings-table-head.staff-head { grid-template-columns: 1fr 8.5rem 6.5rem; }
+    .settings-table-head.closure-head { grid-template-columns: 7.5rem 1fr 7rem 6.5rem; }
+    @media (max-width: 720px) { .settings-table-head { display: none; } }
+
+    .staff-settings-list { display: flex; flex-direction: column; gap: .65rem; max-height: min(52vh, 460px); overflow-y: auto; }
     .staff-row {
-      display: grid; grid-template-columns: 1fr 5.5rem auto; gap: .65rem; align-items: center;
+      display: grid; grid-template-columns: 1fr 8.5rem 6.5rem; gap: .65rem; align-items: center;
       border: 1px solid var(--line); border-radius: 12px; padding: .75rem .85rem; background: var(--status-bg);
     }
-    @media (max-width: 640px) { .staff-row { grid-template-columns: 1fr; } }
+    @media (max-width: 720px) { .staff-row { grid-template-columns: 1fr; } }
     .staff-row-name { font-size: .9rem; font-weight: 700; }
     .staff-row-meta { font-size: .75rem; color: var(--muted); margin-top: .1rem; }
+    .staff-field-label { display: none; font-size: .72rem; font-weight: 700; color: var(--muted); margin-bottom: .25rem; text-transform: uppercase; letter-spacing: .04em; }
+    @media (max-width: 720px) { .staff-field-label { display: block; } }
     .staff-row input[type="number"] {
       width: 100%; height: 38px; padding: 0 .65rem; border: 1px solid var(--line); border-radius: 10px;
       font-family: inherit; font-size: .88rem; background: var(--bg);
     }
 
-    .settings-tabs { display: flex; gap: .5rem; margin-bottom: 1rem; flex-wrap: wrap; }
+    .settings-tabs { display: flex; gap: .5rem; margin-bottom: 1.15rem; flex-wrap: wrap; }
     .settings-tab {
       height: 36px; padding: 0 1rem; border: 1px solid var(--line); border-radius: 999px;
       background: var(--bg); color: var(--muted); font-family: inherit; font-size: .85rem; font-weight: 600; cursor: pointer;
     }
     .settings-tab.is-active { border-color: var(--brand); color: var(--brand); background: var(--brand-light); }
     .settings-tab-panel[hidden] { display: none !important; }
-    .modal-box--wide { max-width: 720px; padding: 0; overflow: hidden; }
+    .modal-box--wide {
+      max-width: min(1080px, 96vw); width: 100%; padding: 0; overflow: hidden;
+    }
     .modal-box--wide .modal-box-head {
       display: flex; align-items: center; justify-content: space-between; gap: 1rem;
-      padding: 1.25rem 1.5rem; border-bottom: 1px solid var(--line);
+      padding: 1.35rem 2rem; border-bottom: 1px solid var(--line);
     }
-    .modal-box--wide .modal-box-head h2 { margin: 0; font-size: 1.15rem; }
-    .modal-box--wide .modal-box-body { padding: 1.25rem 1.5rem 1.5rem; max-height: min(72vh, 680px); overflow-y: auto; }
+    .modal-box--wide .modal-box-head h2 { margin: 0; font-size: 1.25rem; }
+    .modal-box--wide .modal-box-body {
+      padding: 1.5rem 2rem 2rem; max-height: min(84vh, 820px); overflow-y: auto;
+    }
+    .closure-list { max-height: min(52vh, 460px); overflow-y: auto; }
     .modal-close-btn {
       width: 36px; height: 36px; border: none; border-radius: 50%; background: var(--status-bg);
       color: var(--muted); cursor: pointer; font-size: 1rem;
@@ -398,8 +437,9 @@
       <span class="header-sub">Urlaub einreichen &amp; freigeben</span>
     </div>
     <div class="header-right">
-      <button type="button" class="btn-header-gear" id="btn-admin-settings" hidden title="Admin-Einstellungen" aria-label="Admin-Einstellungen">
-        <i class="fa-solid fa-gear"></i>
+      <button type="button" class="btn-header-settings" id="btn-admin-settings" hidden title="Admin-Einstellungen" aria-label="Admin-Einstellungen">
+        <i class="fa-solid fa-gear" aria-hidden="true"></i>
+        <span>Admin-Einstellungen</span>
       </button>
       <div class="dash-avatar" id="user-avatar" style="cursor:pointer" title="Profil"></div>
       <span id="user-name-topbar" class="header-sub"></span>
@@ -465,7 +505,8 @@
       </div>
       <div class="admin-layout-grid">
         <section class="panel">
-          <h2 class="panel-title"><i class="fa-solid fa-users"></i> Team-Übersicht <span id="team-overview-year-label" style="font-size:.85rem;color:var(--muted);font-weight:600"></span></h2>
+          <h2 class="panel-title"><i class="fa-solid fa-users"></i> Urlaubskontingent Team</h2>
+          <p class="panel-desc">Eingeplante Urlaubstage je Mitarbeiter im Jahr <strong id="team-overview-year-label">2026</strong> — genehmigt und noch offen.</p>
           <div class="team-overview-list" id="admin-team-overview"></div>
         </section>
         <section class="panel">
@@ -492,22 +533,35 @@
     </div>
     <div class="modal-box-body">
       <div class="settings-tabs" role="tablist">
-        <button type="button" class="settings-tab is-active" data-settings-tab="staff" role="tab" aria-selected="true">Urlaubstage</button>
-        <button type="button" class="settings-tab" data-settings-tab="closures" role="tab" aria-selected="false">Betriebsferien &amp; ROOTS-Tage</button>
+        <button type="button" class="settings-tab is-active" data-settings-tab="staff" role="tab" aria-selected="true">Urlaubstage pro Mitarbeiter</button>
+        <button type="button" class="settings-tab" data-settings-tab="closures" role="tab" aria-selected="false">Betriebsferien &amp; freie Tage</button>
       </div>
       <div class="settings-tab-panel" id="settings-tab-staff" role="tabpanel">
-        <p style="color:var(--muted);margin-bottom:1rem;font-size:.9rem;line-height:1.45;">
-          Lege die verfügbaren Urlaubstage pro Mitarbeiter fest. Genehmigte und offene Anträge ziehen davon automatisch ab.
-        </p>
+        <div class="settings-hint">
+          <i class="fa-solid fa-circle-info"></i>
+          <div>Hier legst du fest, wie viele Urlaubstage jede Person pro Jahr hat. Genehmigte und noch offene Anträge werden automatisch davon abgezogen.</div>
+        </div>
+        <div class="settings-table-head staff-head">
+          <span>Mitarbeiter</span>
+          <span>Urlaubstage / Jahr</span>
+          <span></span>
+        </div>
         <div class="staff-settings-list" id="admin-staff-list"></div>
       </div>
       <div class="settings-tab-panel" id="settings-tab-closures" role="tabpanel" hidden>
-        <p style="color:var(--muted);margin-bottom:.85rem;font-size:.9rem;line-height:1.45;">
-          Verpflichtende freie Tage und Betriebsferien werden automatisch im Team-Kalender eingetragen.
-        </p>
+        <div class="settings-hint">
+          <i class="fa-solid fa-circle-info"></i>
+          <div>Firmenfreie Tage und Betriebsferien trägst du hier ein. Sie erscheinen automatisch im Team-Kalender und können von Mitarbeitern nicht selbst geändert werden.</div>
+        </div>
         <div class="closure-toolbar">
-          <label for="settings-closure-year">Jahr</label>
+          <label for="settings-closure-year">Jahr auswählen</label>
           <select id="settings-closure-year"></select>
+        </div>
+        <div class="settings-table-head closure-head">
+          <span>Datum</span>
+          <span>Bezeichnung</span>
+          <span>Abzug Urlaub</span>
+          <span></span>
         </div>
         <div class="closure-list" id="admin-settings-closures-list"></div>
       </div>

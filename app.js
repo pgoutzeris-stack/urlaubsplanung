@@ -194,7 +194,7 @@ async function refreshRole() {
   if (els.adminBadge) els.adminBadge.hidden = !isAdmin;
   if (els.greetingDesc) {
     els.greetingDesc.textContent = isAdmin
-      ? "Prüfe offene Urlaubsanträge und behalte Urlaubskontingente im Blick. Einstellungen findest du über das Zahnrad oben rechts."
+      ? "Prüfe offene Urlaubsanträge und behalte Urlaubskontingente im Blick. Über „Admin-Einstellungen“ oben rechts kannst du Urlaubstage und Betriebsferien verwalten."
       : "Reiche hier deinen Urlaub ein. Nach der Freigabe durch einen Admin wird er automatisch im Team-Kalender eingetragen. Wochenenden und Feiertage sind nicht möglich.";
   }
 }
@@ -221,24 +221,34 @@ async function loadTeamOverview(year) {
   renderTeamOverview();
 }
 
+function closureKindLabel(kind) {
+  const k = String(kind || "").toLowerCase();
+  if (k.includes("betrieb")) return "Betriebsferien";
+  if (k.includes("bridge") || k.includes("brueck")) return "Brückentag";
+  if (k.includes("holiday") || k.includes("feiertag")) return "Feiertag";
+  if (k.includes("roots") || k.includes("firm")) return "Firmenfreier Tag";
+  return "Freier Tag";
+}
+
 function renderTeamOverview() {
   if (!els.adminTeamOverview) return;
   if (els.teamOverviewYearLabel) {
-    els.teamOverviewYearLabel.textContent = `(${teamOverviewYear})`;
+    els.teamOverviewYearLabel.textContent = String(teamOverviewYear);
   }
   if (els.adminTeamCount) {
     els.adminTeamCount.textContent = String(teamOverview.length);
   }
   if (!teamOverview.length) {
     els.adminTeamOverview.innerHTML =
-      '<div class="empty-state"><i class="fa-solid fa-users"></i><p>Keine Team-Daten verfügbar.</p></div>';
+      '<div class="empty-state"><i class="fa-solid fa-users"></i><p>Keine Mitarbeiter-Daten für dieses Jahr.</p></div>';
     return;
   }
   els.adminTeamOverview.innerHTML = teamOverview
     .map((row) => {
       const kz = escapeHtml((row.kuerzel || row.full_name || "?").slice(0, 4).toUpperCase());
       const total = Math.max(row.total_allowance || 0, 1);
-      const pct = Math.min(100, Math.round(((row.planned_days || 0) / total) * 100));
+      const planned = row.planned_days || 0;
+      const pct = Math.min(100, Math.round((planned / total) * 100));
       const pendingHint =
         row.pending_count > 0
           ? `${row.pending_count} offene${row.pending_count === 1 ? "r" : ""} Antrag${row.pending_count === 1 ? "" : "e"}`
@@ -249,9 +259,9 @@ function renderTeamOverview() {
             <span class="team-kuerzel">${kz}</span>
             <span class="team-row-title">${escapeHtml(row.full_name)}</span>
           </div>
-          <span class="team-row-main">${row.planned_days || 0} / ${total} Tage</span>
+          <span class="team-row-main">${planned} von ${total} Tagen<small>eingeplant</small></span>
         </div>
-        <div class="team-row-sub">${row.remaining ?? 0} verbleibend · ${pendingHint}</div>
+        <div class="team-row-sub">${row.remaining ?? 0} Tage frei · ${pendingHint}</div>
         <div class="team-progress" aria-hidden="true"><span style="width:${pct}%"></span></div>
       </article>`;
     })
@@ -279,7 +289,10 @@ function renderStaffSettings() {
           <div class="staff-row-name">${escapeHtml(row.full_name)}</div>
           <div class="staff-row-meta">${escapeHtml(row.kuerzel || "—")}</div>
         </div>
-        <input type="number" min="0" max="365" step="1" data-field="urlaubstage" value="${Number(row.urlaubstage || 0)}" aria-label="Urlaubstage für ${escapeHtml(row.full_name)}" />
+        <div>
+          <div class="staff-field-label">Urlaubstage / Jahr</div>
+          <input type="number" min="0" max="365" step="1" data-field="urlaubstage" value="${Number(row.urlaubstage || 0)}" aria-label="Urlaubstage pro Jahr für ${escapeHtml(row.full_name)}" />
+        </div>
         <button type="button" class="btn-closure-save" data-save-staff="${row.user_id}">Speichern</button>
       </div>`,
     )
@@ -363,7 +376,7 @@ function renderClosuresAdmin() {
   yearEl.value = String(closureYear);
   if (!closures.length) {
     listEl.innerHTML =
-      '<div class="empty-state"><i class="fa-regular fa-calendar"></i>Keine ROOTS-Tage für dieses Jahr hinterlegt.</div>';
+      '<div class="empty-state"><i class="fa-regular fa-calendar"></i>Keine firmenfreien Tage für dieses Jahr hinterlegt.</div>';
     return;
   }
   listEl.innerHTML = closures
@@ -371,10 +384,16 @@ function renderClosuresAdmin() {
       (row) => `<div class="closure-row" data-closure-id="${row.id}">
       <div>
         <div class="closure-row-date">${formatDeYmd(row.closure_date)}</div>
-        <div class="closure-row-kind">${escapeHtml(row.closure_kind || "roots")}</div>
+        <span class="closure-row-badge">${escapeHtml(closureKindLabel(row.closure_kind))}</span>
       </div>
-      <input type="text" data-field="label" value="${escapeHtml(row.label || "")}" aria-label="Bezeichnung" />
-      <input type="number" data-field="deduct_days" min="0" max="5" step="0.5" value="${Number(row.deduct_days || 0)}" aria-label="Abzug Urlaubstage" />
+      <div>
+        <div class="closure-field-label">Bezeichnung</div>
+        <input type="text" data-field="label" value="${escapeHtml(row.label || "")}" placeholder="z. B. Betriebsferien Sommer" aria-label="Bezeichnung" />
+      </div>
+      <div>
+        <div class="closure-field-label">Abzug Urlaub (Tage)</div>
+        <input type="number" data-field="deduct_days" min="0" max="5" step="0.5" value="${Number(row.deduct_days || 0)}" aria-label="Abzug vom Urlaubskonto in Tagen" />
+      </div>
       <button type="button" class="btn-closure-save" data-save-closure="${row.id}">Speichern</button>
     </div>`,
     )
@@ -396,7 +415,7 @@ async function saveClosureRow(id) {
   }
   try {
     await api("POST", { action: "update_closure", id, label, deduct_days });
-    toast("ROOTS-Tag gespeichert", "ok");
+    toast("Freier Tag gespeichert", "ok");
     await loadClosures(closureYear);
   } catch (e) {
     toast(e.message || "Speichern fehlgeschlagen", "err");

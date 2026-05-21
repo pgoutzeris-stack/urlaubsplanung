@@ -808,7 +808,7 @@ Deno.serve(async (req) => {
         }
         if (await isClosureAutoRequest(service, id)) {
           return json(
-            { error: "Betriebsferien und ROOTS-Tage können nicht storniert werden" },
+            { error: "Betriebsferien und firmenfreie Tage können nicht storniert werden" },
             403,
             c,
           );
@@ -824,7 +824,7 @@ Deno.serve(async (req) => {
           if (evErr) throw evErr;
           if (evRow?.is_system) {
             return json(
-              { error: "Betriebsferien und ROOTS-Tage können nicht storniert werden" },
+              { error: "Betriebsferien und firmenfreie Tage können nicht storniert werden" },
               403,
               c,
             );
