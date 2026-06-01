@@ -663,21 +663,25 @@ async function bootApp() {
   }
 }
 
-function bindUi() {
-  // Halbtag-Chips: nur bei Einzeltag anzeigen, reset bei Mehrfachtag
-  function updateDaypartVisibility() {
-    const wrap = document.getElementById("f-daypart-wrap");
-    const hdnInput = document.getElementById("f-daypart");
-    if (!wrap) return;
-    const isSingleDay = els.fStart.value && els.fEnd.value && els.fStart.value === els.fEnd.value;
-    wrap.style.display = isSingleDay ? "" : "none";
-    if (!isSingleDay && hdnInput) {
-      hdnInput.value = "full";
-      document.querySelectorAll("#f-daypart-chips .daypart-chip").forEach((b) => {
-        b.classList.toggle("is-active", b.dataset.part === "full");
-      });
-    }
+// Global: Halbtag-Chips zeigen/verstecken — außerhalb bindUi damit sie
+// auch beim Init-Aufruf nach dem Date-Setzen erreichbar ist
+function updateDaypartVisibility() {
+  const wrap = document.getElementById("f-daypart-wrap");
+  const hdnInput = document.getElementById("f-daypart");
+  if (!wrap) return;
+  const startEl = document.getElementById("f-start");
+  const endEl   = document.getElementById("f-end");
+  const isSingleDay = startEl?.value && endEl?.value && startEl.value === endEl.value;
+  wrap.style.display = isSingleDay ? "" : "none";
+  if (!isSingleDay && hdnInput) {
+    hdnInput.value = "full";
+    document.querySelectorAll("#f-daypart-chips .daypart-chip").forEach((b) => {
+      b.classList.toggle("is-active", b.dataset.part === "full");
+    });
   }
+}
+
+function bindUi() {
   document.getElementById("f-daypart-chips")?.addEventListener("click", (e) => {
     const btn = e.target.closest("[data-part]");
     if (!btn) return;
