@@ -162,7 +162,8 @@
     .panel-desc { color: var(--muted); font-size: .88rem; line-height: 1.5; margin-bottom: 1rem; max-width: 36rem; }
     .panel-desc strong { color: var(--ink); font-weight: 700; }
     .date-row { display: grid; grid-template-columns: 1fr 1fr; gap: .75rem; }
-    .daypart-chips { display: grid; grid-template-columns: repeat(3,1fr); gap: .5rem; margin-top: .35rem; }
+    .daypart-chips { display: grid; grid-template-columns: repeat(3,1fr); gap: .5rem; }
+    #f-daypart-wrap { margin-top: .75rem; margin-bottom: 1.25rem; }
     .daypart-chip { height:38px; border:1.5px solid var(--line,#e2e8f0); border-radius:10px; background:var(--bg,#fff); color:var(--muted,#64748b); font-size:.8rem; font-weight:600; cursor:pointer; display:flex; align-items:center; justify-content:center; gap:.4rem; transition:all .15s; font-family:inherit; }
     .daypart-chip:hover { border-color:var(--brand,#206efb); color:var(--brand,#206efb); }
     .daypart-chip.is-active { border-color:var(--brand,#206efb); background:var(--brand-light,#eff6ff); color:var(--brand,#206efb); }
@@ -515,9 +516,8 @@
                 <input type="date" id="f-end" required />
               </div>
             </div>
-            <div class="form-group" id="f-daypart-wrap" style="display:none">
-              <label>Tagesumfang</label>
-              <div class="daypart-chips" id="f-daypart-chips" role="group">
+            <div id="f-daypart-wrap" style="display:none">
+              <div class="daypart-chips" id="f-daypart-chips" role="group" aria-label="Tagesumfang">
                 <button type="button" class="daypart-chip is-active" data-part="full"><i class="fa-regular fa-sun"></i> Ganztägig</button>
                 <button type="button" class="daypart-chip" data-part="am"><i class="fa-solid fa-mug-saucer"></i> Vormittag</button>
                 <button type="button" class="daypart-chip" data-part="pm"><i class="fa-solid fa-cloud-sun"></i> Nachmittag</button>
