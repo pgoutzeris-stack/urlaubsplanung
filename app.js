@@ -591,6 +591,7 @@ async function handleSubmit(e) {
   const start = els.fStart.value;
   const end = els.fEnd.value;
   const note = els.fNote.value.trim();
+  const day_part = (document.getElementById("f-daypart")?.value) || "full";
   if (!start || !end || end < start) {
     toast("Bitte einen gültigen Zeitraum wählen", "err");
     return;
@@ -616,7 +617,7 @@ async function handleSubmit(e) {
   const btn = els.btnSubmit;
   btn.disabled = true;
   try {
-    await api("POST", { action: "create", start_date: start, end_date: end, note: note || null });
+    await api("POST", { action: "create", start_date: start, end_date: end, note: note || null, day_part });
     toast("Urlaubsantrag eingereicht", "ok");
     els.form.reset();
     const today = new Date().toISOString().slice(0, 10);
@@ -663,10 +664,35 @@ async function bootApp() {
 }
 
 function bindUi() {
+  // Halbtag-Chips: nur bei Einzeltag anzeigen, reset bei Mehrfachtag
+  function updateDaypartVisibility() {
+    const wrap = document.getElementById("f-daypart-wrap");
+    const hdnInput = document.getElementById("f-daypart");
+    if (!wrap) return;
+    const isSingleDay = els.fStart.value && els.fEnd.value && els.fStart.value === els.fEnd.value;
+    wrap.style.display = isSingleDay ? "" : "none";
+    if (!isSingleDay && hdnInput) {
+      hdnInput.value = "full";
+      document.querySelectorAll("#f-daypart-chips .daypart-chip").forEach((b) => {
+        b.classList.toggle("is-active", b.dataset.part === "full");
+      });
+    }
+  }
+  document.getElementById("f-daypart-chips")?.addEventListener("click", (e) => {
+    const btn = e.target.closest("[data-part]");
+    if (!btn) return;
+    document.querySelectorAll("#f-daypart-chips .daypart-chip").forEach((b) => b.classList.remove("is-active"));
+    btn.classList.add("is-active");
+    const hdnInput = document.getElementById("f-daypart");
+    if (hdnInput) hdnInput.value = btn.dataset.part;
+  });
+
   els.form.addEventListener("submit", handleSubmit);
   els.fStart.addEventListener("change", () => {
     if (els.fEnd.value && els.fEnd.value < els.fStart.value) els.fEnd.value = els.fStart.value;
+    updateDaypartVisibility();
   });
+  els.fEnd?.addEventListener("change", updateDaypartVisibility);
   els.btnRejectConfirm.addEventListener("click", () => void handleReject());
   els.btnRejectCancel.addEventListener("click", closeRejectModal);
   els.rejectModal.addEventListener("click", (e) => {

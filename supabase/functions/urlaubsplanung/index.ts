@@ -193,6 +193,20 @@ function countWorkingDaysInRange(
   return n;
 }
 
+/** Wie countWorkingDaysInRange, aber 0,5 für Halbtage (am/pm, nur Eintages-Anträge) */
+function countRequestDays(
+  start: string,
+  end: string,
+  dayPart: string,
+  holidays: Map<string, string>,
+): number {
+  const full = countWorkingDaysInRange(start, end, holidays);
+  if ((dayPart === "am" || dayPart === "pm") && start === end && full === 1) {
+    return 0.5;
+  }
+  return full;
+}
+
 function validateNewVacationRange(
   start: string,
   end: string,
@@ -704,6 +718,9 @@ Deno.serve(async (req) => {
         const end_date = String(body.end_date ?? "").slice(0, 10);
         const note =
           body.note == null || body.note === "" ? null : String(body.note).trim();
+        const rawDayPart = String(body.day_part ?? "full");
+        const day_part = (rawDayPart === "am" || rawDayPart === "pm") && start_date === end_date
+          ? rawDayPart : "full";
         if (!start_date || !end_date || end_date < start_date) {
           return json({ error: "Ungültiger Zeitraum" }, 400, c);
         }
@@ -713,7 +730,8 @@ Deno.serve(async (req) => {
         if (!rangeCheck.ok) {
           return json({ error: rangeCheck.error }, 400, c);
         }
-        const requestedDays = rangeCheck.days;
+        // Halbtag = 0,5 Arbeitstage
+        const requestedDays = countRequestDays(start_date, end_date, day_part, holidays);
 
         const { data: mine, error: mineErr } = await service
           .from("urlaub_requests")
@@ -759,6 +777,7 @@ Deno.serve(async (req) => {
             start_date,
             end_date,
             note,
+            day_part,
             status: "pending",
           })
           .select("*")
@@ -853,9 +872,11 @@ Deno.serve(async (req) => {
           if (delErr) throw delErr;
         }
 
-        const refundDays = countWorkingDaysInRange(
+        const cancelDayPart = String(reqRow.day_part ?? "full");
+        const refundDays = countRequestDays(
           reqRow.start_date as string,
           reqRow.end_date as string,
+          cancelDayPart,
           await loadHolidayMap(
             kalender,
             reqRow.start_date as string,
@@ -925,16 +946,18 @@ Deno.serve(async (req) => {
           return json(rowOut(data as Record<string, unknown>), 200, c);
         }
 
-        const approvedDays = countWorkingDaysInRange(
+        const reqDayPart = String(reqRow.day_part ?? "full");
+        const approvedDays = countRequestDays(
           reqRow.start_date as string,
           reqRow.end_date as string,
+          reqDayPart,
           await loadHolidayMap(
             kalender,
             reqRow.start_date as string,
             reqRow.end_date as string,
           ),
         );
-        if (approvedDays < 1) {
+        if (approvedDays < 0.5) {
           return json({ error: "Antrag enthält keine gültigen Urlaubstage" }, 400, c);
         }
         await deductUrlaubstage(service, reqRow.user_id as string, approvedDays);
@@ -970,6 +993,7 @@ Deno.serve(async (req) => {
             start_date: reqRow.start_date,
             end_date: reqRow.end_date,
             note: reqRow.note,
+            day_part: reqDayPart,
             is_system: false,
           })
           .select("id")
