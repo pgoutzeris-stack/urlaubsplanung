@@ -792,6 +792,7 @@ export function initApp(client) {
   const today = new Date().toISOString().slice(0, 10);
   els.fStart.value = today;
   els.fEnd.value = today;
+  updateDaypartVisibility(); // Chips beim Start zeigen wenn Von=Bis=heute
   syncAdminSettingsButton();
   if (isProfileReady()) void bootApp();
 }
