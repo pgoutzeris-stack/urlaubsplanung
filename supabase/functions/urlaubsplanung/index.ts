@@ -557,6 +557,7 @@ Deno.serve(async (req) => {
     email?: string;
     app_role?: string;
     urlaubstage?: number | null;
+    kuerzel?: string | null;
   } | null;
 
   const isAdmin = profile?.app_role === "admin";
@@ -919,11 +920,25 @@ Deno.serve(async (req) => {
         }
         await deductUrlaubstage(service, reqRow.user_id as string, approvedDays);
 
+        const applicantProfileRes = await loadProfile(service, reqRow.user_id as string);
+        if (applicantProfileRes.error) throw applicantProfileRes.error;
+        const applicantProfile = applicantProfileRes.data as {
+          full_name?: string;
+          email?: string;
+          kuerzel?: string | null;
+        } | null;
+        const applicantName = (
+          (reqRow.applicant_name as string) ||
+          applicantProfile?.full_name ||
+          applicantProfile?.email ||
+          displayName
+        ).trim();
+
         const member = await ensureTeamMember(
           kalender,
           reqRow.user_id as string,
-          (reqRow.applicant_name as string) || displayName,
-          profile?.kuerzel,
+          applicantName,
+          applicantProfile?.kuerzel,
         );
         const kz = deriveKuerzel(member.name, member.kuerzel);
         const title = `${kz}: Urlaub`;
