@@ -267,23 +267,35 @@ function renderTeamOverview() {
   els.adminTeamOverview.innerHTML = teamOverview
     .map((row) => {
       const kz = escapeHtml((row.kuerzel || row.full_name || "?").slice(0, 4).toUpperCase());
-      const total = Math.max(row.total_allowance || 0, 1);
-      const planned = row.planned_days || 0;
-      const pct = Math.min(100, Math.round((planned / total) * 100));
+      // total_allowance = immer urlaubstage_jahr (30)
+      const total      = Math.max(row.total_allowance || 30, 1);
+      const betrieb    = row.betrieb_days  || 0;  // Betriebsferien (fest abgezogen)
+      const approved   = row.approved_days || 0;  // genehmigter Urlaub
+      const pending    = row.pending_days  || 0;  // offene Anträge
+      // Balken-Prozentsätze (alle relativ zu total = 30)
+      const pctBetrieb  = Math.min(100, Math.round((betrieb           / total) * 100));
+      const pctApproved = Math.min(100 - pctBetrieb, Math.round((approved / total) * 100));
+      const pctPending  = Math.min(100 - pctBetrieb - pctApproved, Math.round((pending / total) * 100));
       const pendingHint =
         row.pending_count > 0
           ? `${row.pending_count} offene${row.pending_count === 1 ? "r" : ""} Antrag${row.pending_count === 1 ? "" : "e"}`
           : "Keine offenen Anträge";
+      // Sub-Zeile: zeige was genommen wurde aus initialen 30
+      const takenTotal = betrieb + approved;
       return `<article class="team-row">
         <div class="team-row-head">
           <div class="team-row-name">
             <span class="team-kuerzel">${kz}</span>
             <span class="team-row-title">${escapeHtml(row.full_name)}</span>
           </div>
-          <span class="team-row-main">${planned} von ${total} Tagen<small>eingeplant</small></span>
+          <span class="team-row-main">${takenTotal} von ${total} Tagen<small>genommen</small></span>
         </div>
         <div class="team-row-sub">${row.remaining ?? 0} Tage frei · ${pendingHint}</div>
-        <div class="team-progress" aria-hidden="true"><span style="width:${pct}%"></span></div>
+        <div class="team-progress team-progress--segmented" aria-hidden="true" title="${betrieb}d Betriebsferien · ${approved}d Urlaub · ${pending}d offen">
+          <span class="team-progress-betrieb" style="width:${pctBetrieb}%"></span>
+          <span class="team-progress-approved" style="width:${pctApproved}%"></span>
+          <span class="team-progress-pending"  style="width:${pctPending}%"></span>
+        </div>
       </article>`;
     })
     .join("");

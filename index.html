@@ -256,7 +256,12 @@
     .team-row-main { font-size: .86rem; font-weight: 700; color: var(--brand); white-space: nowrap; text-align: right; line-height: 1.35; }
     .team-row-main small { display: block; font-size: .72rem; font-weight: 600; color: var(--muted); }
     .team-row-sub { font-size: .78rem; color: var(--muted); margin-top: .2rem; }
-    .team-progress { height: 6px; border-radius: 999px; background: var(--line); overflow: hidden; margin-top: .55rem; }
+    .team-progress { height: 6px; border-radius: 999px; background: var(--line); overflow: hidden; margin-top: .55rem; position: relative; }
+    .team-progress--segmented { display: flex; }
+    .team-progress--segmented span { border-radius: 0; flex-shrink: 0; }
+    .team-progress-betrieb  { background: #94a3b8; }
+    .team-progress-approved { background: #16a34a; }
+    .team-progress-pending  { background: #86efac; }
     .team-progress > span { display: block; height: 100%; border-radius: 999px; background: linear-gradient(90deg, var(--brand), #60a5fa); }
 
     .settings-hint {

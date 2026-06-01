@@ -360,7 +360,7 @@ async function buildTeamOverview(
   const { data: profiles, error: profErr } = await service
     .schema("users")
     .from("profiles")
-    .select("id,full_name,email,kuerzel,urlaubstage")
+    .select("id,full_name,email,kuerzel,urlaubstage,urlaubstage_jahr")
     .order("full_name");
   if (profErr) throw profErr;
 
@@ -368,6 +368,15 @@ async function buildTeamOverview(
     .from("urlaub_requests")
     .select("id,user_id,start_date,end_date,status");
   if (reqErr) throw reqErr;
+
+  // Betriebsferien-Abzüge pro User (direkt aus closure_assignments, nicht urlaub_requests)
+  const { data: closures } = await service
+    .from("roots_closure_assignments")
+    .select("user_id,deducted_days");
+  const betriebsByUser: Record<string, number> = {};
+  for (const row of closures ?? []) {
+    betriebsByUser[row.user_id] = (betriebsByUser[row.user_id] ?? 0) + Number(row.deducted_days ?? 0);
+  }
 
   const rows = (profiles ?? [])
     .filter((p) => {
@@ -398,18 +407,24 @@ async function buildTeamOverview(
         }
       }
 
-      const allowance = getUrlaubstage(p);
+      // Initiales Jahres-Kontingent (immer urlaubstage_jahr, Fallback DEFAULT_URLAUBSTAGE)
+      const initial = Number((p as any).urlaubstage_jahr ?? DEFAULT_URLAUBSTAGE);
+      const betriebsDays = betriebsByUser[userId] ?? 0;
       const plannedDays = approvedDays + pendingDays;
+      // Verbleibend = initial - betriebsferien - genehmigter Urlaub
+      const remaining = Math.max(0, initial - betriebsDays - approvedDays);
+
       return {
         user_id: userId,
         full_name: p.full_name || p.email || "—",
         kuerzel: p.kuerzel || null,
-        remaining: Math.max(0, allowance - plannedDays),
+        remaining,
         approved_days: approvedDays,
         pending_days: pendingDays,
         planned_days: plannedDays,
+        betrieb_days: betriebsDays,
         pending_count: pendingCount,
-        total_allowance: allowance,
+        total_allowance: initial,  // immer 30 (urlaubstage_jahr)
       };
     });
 
