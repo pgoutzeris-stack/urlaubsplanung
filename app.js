@@ -441,8 +441,12 @@ function updateStats() {
 
 function renderRequestCard(r, { showActions = false, showUserActions = false } = {}) {
   const st = STATUS[r.status] || STATUS.pending;
-  const days = countWorkingDays(r.start_date, r.end_date);
-  const dayLabel = days === 1 ? "Urlaubstag" : "Urlaubstage";
+  const isHalf = (r.day_part === "am" || r.day_part === "pm") && r.start_date === r.end_date;
+  const days = isHalf ? 0.5 : countWorkingDays(r.start_date, r.end_date);
+  const dayLabel = days === 1 ? "Urlaubstag" : days === 0.5 ? "Urlaubstag" : "Urlaubstage";
+  const halfBadge = isHalf
+    ? `<span class="half-day-badge"><i class="fa-solid fa-${r.day_part === "am" ? "mug-saucer" : "cloud-sun"}"></i> ${r.day_part === "am" ? "Vormittag" : "Nachmittag"}</span>`
+    : "";
   const actions =
     showActions && r.status === "pending"
       ? `<div class="req-actions">
@@ -473,7 +477,7 @@ function renderRequestCard(r, { showActions = false, showUserActions = false } =
     <div class="req-card-top">
       <div>
         <h3 class="req-name">${escapeHtml(r.applicant_name)}</h3>
-        <p class="req-range">${formatDeYmd(r.start_date)} – ${formatDeYmd(r.end_date)} · ${days} ${dayLabel}</p>
+        <p class="req-range">${formatDeYmd(r.start_date)} – ${formatDeYmd(r.end_date)} · ${days} ${dayLabel}${halfBadge}</p>
       </div>
       <span class="status-pill ${st.cls}"><i class="fa-solid ${st.icon}"></i> ${st.label}</span>
     </div>
