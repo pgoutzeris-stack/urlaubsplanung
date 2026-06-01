@@ -410,21 +410,25 @@ async function buildTeamOverview(
       // Initiales Jahres-Kontingent (immer urlaubstage_jahr, Fallback DEFAULT_URLAUBSTAGE)
       const initial = Number((p as any).urlaubstage_jahr ?? DEFAULT_URLAUBSTAGE);
       const betriebsDays = betriebsByUser[userId] ?? 0;
-      const plannedDays = approvedDays + pendingDays;
-      // Verbleibend = initial - betriebsferien - genehmigter Urlaub
-      const remaining = Math.max(0, initial - betriebsDays - approvedDays);
+      // urlaubstage = verbleibende Tage (single source of truth, wird von
+      // allen Quellen korrekt abgezogen: Betriebsferien, Urlaubsplanung, Team-Kalender-Admin)
+      const remaining = Math.max(0, Number((p as any).urlaubstage ?? initial));
+      // Tatsächlich verbrauchter Urlaub = initial - betriebsferien - verbleibend
+      // Deckt alle Quellen ab: genehmigter Urlaub UND Admin-Direkteinträge im Kalender
+      const realApprovedDays = Math.max(0, initial - betriebsDays - remaining);
+      const plannedDays = realApprovedDays + pendingDays;
 
       return {
         user_id: userId,
         full_name: p.full_name || p.email || "—",
         kuerzel: p.kuerzel || null,
         remaining,
-        approved_days: approvedDays,
+        approved_days: realApprovedDays,
         pending_days: pendingDays,
         planned_days: plannedDays,
         betrieb_days: betriebsDays,
         pending_count: pendingCount,
-        total_allowance: initial,  // immer 30 (urlaubstage_jahr)
+        total_allowance: initial,
       };
     });
 
