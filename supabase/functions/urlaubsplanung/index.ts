@@ -214,28 +214,43 @@ function validateNewVacationRange(
 ): { ok: true; days: number } | { ok: false; error: string } {
   let days = 0;
   for (const day of eachDayYmd(start, end)) {
-    if (isWeekendYmd(day)) {
-      const weekday = parseYmd(day).toLocaleDateString("de-DE", { weekday: "long" });
-      return {
-        ok: false,
-        error:
-          `Urlaub an Wochenenden ist nicht möglich (${formatDeYmd(day)}, ${weekday}). Bitte nur Werktage wählen.`,
-      };
-    }
-    const label = holidays.get(day);
-    if (label) {
-      return {
-        ok: false,
-        error:
-          `Am ${formatDeYmd(day)} (${label}) ist Feiertag – an diesem Tag kann kein Urlaub beantragt werden.`,
-      };
-    }
+    if (isWeekendYmd(day)) continue;
+    if (holidays.has(day)) continue;
     days++;
   }
   if (days === 0) {
     return { ok: false, error: "Der gewählte Zeitraum enthält keine gültigen Urlaubstage." };
   }
   return { ok: true, days };
+}
+
+function splitWorkingDaySegments(
+  start: string,
+  end: string,
+  holidays: Map<string, string>,
+): Array<{ start_date: string; end_date: string }> {
+  const segments: Array<{ start_date: string; end_date: string }> = [];
+  let currentStart: string | null = null;
+  let previousWorking: string | null = null;
+
+  for (const day of eachDayYmd(start, end)) {
+    const isWorking = !isWeekendYmd(day) && !holidays.has(day);
+    if (!isWorking) {
+      if (currentStart && previousWorking) {
+        segments.push({ start_date: currentStart, end_date: previousWorking });
+      }
+      currentStart = null;
+      previousWorking = null;
+      continue;
+    }
+    if (!currentStart) currentStart = day;
+    previousWorking = day;
+  }
+
+  if (currentStart && previousWorking) {
+    segments.push({ start_date: currentStart, end_date: previousWorking });
+  }
+  return segments;
 }
 
 function findRequestConflict(
@@ -267,6 +282,41 @@ async function isClosureAutoRequest(
     .eq("urlaub_request_id", requestId);
   if (error) throw error;
   return (count ?? 0) > 0;
+}
+
+async function deleteCalendarEventsForRequest(
+  kalender: ReturnType<typeof createClient>,
+  requestId: string,
+  calendarEventId?: string | null,
+): Promise<void> {
+  const ids = new Set<string>();
+  const { data: linked, error: linkedErr } = await kalender
+    .from("events")
+    .select("id,is_system")
+    .eq("urlaub_request_id", requestId);
+  if (linkedErr) throw linkedErr;
+  for (const row of linked ?? []) {
+    if (row.is_system) throw new Error("Betriebsferien und firmenfreie Tage können nicht storniert werden");
+    ids.add(String(row.id));
+  }
+
+  if (calendarEventId) {
+    const { data: legacy, error: legacyErr } = await kalender
+      .from("events")
+      .select("id,is_system")
+      .eq("id", calendarEventId)
+      .maybeSingle();
+    if (legacyErr) throw legacyErr;
+    if (legacy?.is_system) {
+      throw new Error("Betriebsferien und firmenfreie Tage können nicht storniert werden");
+    }
+    if (legacy?.id) ids.add(String(legacy.id));
+  }
+
+  if (ids.size) {
+    const { error } = await kalender.from("events").delete().in("id", [...ids]);
+    if (error) throw error;
+  }
 }
 
 async function loadAdminIds(service: ReturnType<typeof createClient>): Promise<string[]> {
@@ -853,23 +903,18 @@ Deno.serve(async (req) => {
           );
         }
 
-        const eventId = reqRow.calendar_event_id as string | null;
-        if (eventId) {
-          const { data: evRow, error: evErr } = await kalender
-            .from("events")
-            .select("id,is_system")
-            .eq("id", eventId)
-            .maybeSingle();
-          if (evErr) throw evErr;
-          if (evRow?.is_system) {
-            return json(
-              { error: "Betriebsferien und firmenfreie Tage können nicht storniert werden" },
-              403,
-              c,
-            );
+        try {
+          await deleteCalendarEventsForRequest(
+            kalender,
+            id,
+            reqRow.calendar_event_id as string | null,
+          );
+        } catch (err) {
+          const msg = err instanceof Error ? err.message : "Kalendereinträge konnten nicht entfernt werden";
+          if (/Betriebsferien|firmenfreie/.test(msg)) {
+            return json({ error: msg }, 403, c);
           }
-          const { error: delErr } = await kalender.from("events").delete().eq("id", eventId);
-          if (delErr) throw delErr;
+          throw err;
         }
 
         const cancelDayPart = String(reqRow.day_part ?? "full");
@@ -947,15 +992,16 @@ Deno.serve(async (req) => {
         }
 
         const reqDayPart = String(reqRow.day_part ?? "full");
+        const approvalHolidays = await loadHolidayMap(
+          kalender,
+          reqRow.start_date as string,
+          reqRow.end_date as string,
+        );
         const approvedDays = countRequestDays(
           reqRow.start_date as string,
           reqRow.end_date as string,
           reqDayPart,
-          await loadHolidayMap(
-            kalender,
-            reqRow.start_date as string,
-            reqRow.end_date as string,
-          ),
+          approvalHolidays,
         );
         if (approvedDays < 0.5) {
           return json({ error: "Antrag enthält keine gültigen Urlaubstage" }, 400, c);
@@ -984,21 +1030,31 @@ Deno.serve(async (req) => {
         );
         const kz = deriveKuerzel(member.name, member.kuerzel);
         const title = `${kz}: Urlaub`;
-        const { data: ev, error: evErr } = await kalender
+        const segments = splitWorkingDaySegments(
+          reqRow.start_date as string,
+          reqRow.end_date as string,
+          approvalHolidays,
+        );
+        const eventRows = segments.map((segment) => ({
+          member_id: member.id,
+          type: "urlaub",
+          title,
+          start_date: segment.start_date,
+          end_date: segment.end_date,
+          note: reqRow.note,
+          day_part:
+            segments.length === 1 && segment.start_date === segment.end_date ? reqDayPart : "full",
+          is_system: false,
+          urlaub_request_id: id,
+        }));
+        const { data: evRows, error: evErr } = await kalender
           .from("events")
-          .insert({
-            member_id: member.id,
-            type: "urlaub",
-            title,
-            start_date: reqRow.start_date,
-            end_date: reqRow.end_date,
-            note: reqRow.note,
-            day_part: reqDayPart,
-            is_system: false,
-          })
-          .select("id")
-          .single();
+          .insert(eventRows)
+          .select("id,start_date")
+          .order("start_date", { ascending: true });
         if (evErr) throw evErr;
+        const firstEventId = evRows?.[0]?.id ?? null;
+        if (!firstEventId) throw new Error("Kalendereintrag konnte nicht erstellt werden");
 
         const { data, error } = await service
           .from("urlaub_requests")
@@ -1007,7 +1063,7 @@ Deno.serve(async (req) => {
             reviewed_by: user.id,
             reviewed_at: new Date().toISOString(),
             team_member_id: member.id,
-            calendar_event_id: ev.id,
+            calendar_event_id: firstEventId,
             updated_at: new Date().toISOString(),
           })
           .eq("id", id)

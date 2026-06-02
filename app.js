@@ -85,20 +85,8 @@ function countWorkingDays(start, end) {
 function validateVacationRange(start, end) {
   let days = 0;
   for (const day of eachDayYmd(start, end)) {
-    if (isWeekendYmd(day)) {
-      const weekday = new Date(day + "T12:00:00").toLocaleDateString("de-DE", { weekday: "long" });
-      return {
-        ok: false,
-        error: `Urlaub an Wochenenden ist nicht möglich (${formatDeYmd(day)}, ${weekday}). Bitte nur Werktage wählen.`,
-      };
-    }
-    const label = holidaysByDate.get(day);
-    if (label) {
-      return {
-        ok: false,
-        error: `Am ${formatDeYmd(day)} (${label}) ist Feiertag – an diesem Tag kann kein Urlaub beantragt werden.`,
-      };
-    }
+    if (isWeekendYmd(day)) continue;
+    if (holidaysByDate.has(day)) continue;
     days++;
   }
   if (days === 0) {
