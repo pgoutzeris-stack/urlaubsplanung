@@ -356,6 +356,23 @@ async function notifyAdmins(
   if (error) console.error("[urlaubsplanung] notifyAdmins", error.message);
 }
 
+async function notifyUser(
+  service: ReturnType<typeof createClient>,
+  userId: string,
+  payload: { type: string; title: string; message: string; meta?: Record<string, unknown> },
+) {
+  const { error } = await service.schema("recruiting").from("notifications").insert([{
+    user_id: userId,
+    type: payload.type,
+    title: payload.title,
+    message: payload.message,
+    session_id: null,
+    runde: null,
+    meta: { ...(payload.meta ?? {}), source: "urlaubsplanung" },
+  }]);
+  if (error) console.error("[urlaubsplanung] notifyUser", error.message);
+}
+
 async function enrichRowOut(
   service: ReturnType<typeof createClient>,
   r: Record<string, unknown>,
@@ -833,6 +850,13 @@ Deno.serve(async (req) => {
           .select("*")
           .single();
         if (error) throw error;
+        // Admin-Benachrichtigung: neuer Antrag eingegangen
+        await notifyAdmins(service, {
+          type: "urlaub_submitted",
+          title: "Neuer Urlaubsantrag",
+          message: `${displayName} beantragt Urlaub vom ${formatDeYmd(start_date)} bis ${formatDeYmd(end_date)}${note ? " (Notiz: " + note + ")" : ""}.`,
+          meta: { request_id: (data as Record<string,unknown>).id, user_id: user.id, applicant_name: displayName },
+        });
         return json(await enrichRowOut(service, data as Record<string, unknown>, user.id), 201, c);
       }
 
@@ -988,6 +1012,13 @@ Deno.serve(async (req) => {
             .select("*")
             .single();
           if (error) throw error;
+          // Antragsteller benachrichtigen: Urlaub abgelehnt
+          await notifyUser(service, reqRow.user_id as string, {
+            type: "urlaub_rejected",
+            title: "Urlaubsantrag abgelehnt",
+            message: `Dein Urlaubsantrag ${formatDeYmd(reqRow.start_date as string)} – ${formatDeYmd(reqRow.end_date as string)} wurde abgelehnt${rejection_reason ? ": " + rejection_reason : "."}`,
+            meta: { request_id: id, reason: rejection_reason },
+          });
           return json(rowOut(data as Record<string, unknown>), 200, c);
         }
 
@@ -1070,6 +1101,13 @@ Deno.serve(async (req) => {
           .select("*")
           .single();
         if (error) throw error;
+        // Antragsteller benachrichtigen: Urlaub genehmigt
+        await notifyUser(service, reqRow.user_id as string, {
+          type: "urlaub_approved",
+          title: "Urlaub genehmigt ✓",
+          message: `Dein Urlaubsantrag ${formatDeYmd(reqRow.start_date as string)} – ${formatDeYmd(reqRow.end_date as string)} wurde genehmigt und im Team-Kalender eingetragen.`,
+          meta: { request_id: id },
+        });
         return json(rowOut(data as Record<string, unknown>), 200, c);
       }
 

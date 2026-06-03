@@ -622,6 +622,48 @@
   </div>
 </div>
 
+<!-- Genehmigen-Modal -->
+<div class="modal-overlay" id="approve-modal" aria-hidden="true">
+  <div class="modal-box" role="dialog" aria-labelledby="approve-modal-title">
+    <h2 id="approve-modal-title"><i class="fa-solid fa-check" style="color:var(--c-success,#16a34a);margin-right:.4rem"></i>Urlaub genehmigen</h2>
+    <p id="approve-modal-text">Urlaub genehmigen und im Team-Kalender eintragen?</p>
+    <div class="modal-actions">
+      <button type="button" class="btn-secondary" id="btn-approve-cancel">Abbrechen</button>
+      <button type="button" class="btn-primary" id="btn-approve-confirm" style="flex:1.2;margin-top:0;background:var(--c-success,#16a34a)">
+        <i class="fa-solid fa-check"></i> Genehmigen
+      </button>
+    </div>
+  </div>
+</div>
+
+<!-- Zurückziehen-Modal -->
+<div class="modal-overlay" id="withdraw-modal" aria-hidden="true">
+  <div class="modal-box" role="dialog" aria-labelledby="withdraw-modal-title">
+    <h2 id="withdraw-modal-title">Antrag zurückziehen</h2>
+    <p>Möchtest du deinen ausstehenden Urlaubsantrag wirklich zurückziehen?</p>
+    <div class="modal-actions">
+      <button type="button" class="btn-secondary" id="btn-withdraw-cancel">Abbrechen</button>
+      <button type="button" class="btn-primary" id="btn-withdraw-confirm" style="flex:1.2;margin-top:0">
+        <i class="fa-solid fa-rotate-left"></i> Zurückziehen
+      </button>
+    </div>
+  </div>
+</div>
+
+<!-- Stornieren-Modal -->
+<div class="modal-overlay" id="cancel-modal" aria-hidden="true">
+  <div class="modal-box" role="dialog" aria-labelledby="cancel-modal-title">
+    <h2 id="cancel-modal-title">Urlaub stornieren</h2>
+    <p>Genehmigten Urlaub wirklich stornieren? Der Kalendereintrag wird entfernt und die Urlaubstage werden wieder gutgeschrieben.</p>
+    <div class="modal-actions">
+      <button type="button" class="btn-secondary" id="btn-cancel-cancel">Abbrechen</button>
+      <button type="button" class="btn-primary" id="btn-cancel-confirm" style="flex:1.2;margin-top:0;background:var(--c-danger,#dc2626)">
+        <i class="fa-solid fa-ban"></i> Stornieren
+      </button>
+    </div>
+  </div>
+</div>
+
 <script>
 window.RootsUser = window.RootsUser || {
   _p:null,_sb:null,_uid:null,

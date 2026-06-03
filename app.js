@@ -516,8 +516,31 @@ function bindUserActions(root) {
   });
 }
 
-async function handleWithdraw(id) {
-  if (!confirm("Ausstehenden Urlaubsantrag wirklich zurückziehen?")) return;
+// ── Modal-Helfer ──────────────────────────────────────────────────────────────
+function openModal(id) {
+  const m = document.getElementById(id);
+  if (!m) return;
+  m.classList.add("is-open");
+  m.setAttribute("aria-hidden", "false");
+}
+function closeModal(id) {
+  const m = document.getElementById(id);
+  if (!m) return;
+  m.classList.remove("is-open");
+  m.setAttribute("aria-hidden", "true");
+}
+
+// ── Zurückziehen ──────────────────────────────────────────────────────────────
+let _withdrawTargetId = null;
+function handleWithdraw(id) {
+  _withdrawTargetId = id;
+  openModal("withdraw-modal");
+}
+async function _confirmWithdraw() {
+  if (!_withdrawTargetId) return;
+  const id = _withdrawTargetId;
+  closeModal("withdraw-modal");
+  _withdrawTargetId = null;
   try {
     await api("POST", { action: "withdraw", id });
     toast("Antrag zurückgezogen", "ok");
@@ -527,8 +550,17 @@ async function handleWithdraw(id) {
   }
 }
 
-async function handleCancelApproved(id) {
-  if (!confirm("Genehmigten Urlaub wirklich stornieren? Der Kalendereintrag wird entfernt und die Urlaubstage werden wieder gutgeschrieben.")) return;
+// ── Stornieren ────────────────────────────────────────────────────────────────
+let _cancelTargetId = null;
+function handleCancelApproved(id) {
+  _cancelTargetId = id;
+  openModal("cancel-modal");
+}
+async function _confirmCancel() {
+  if (!_cancelTargetId) return;
+  const id = _cancelTargetId;
+  closeModal("cancel-modal");
+  _cancelTargetId = null;
   try {
     await api("POST", { action: "cancel_approved", id });
     toast("Urlaub storniert", "ok");
@@ -538,8 +570,17 @@ async function handleCancelApproved(id) {
   }
 }
 
-async function handleApprove(id) {
-  if (!confirm("Urlaub genehmigen und im Team-Kalender eintragen?")) return;
+// ── Genehmigen ────────────────────────────────────────────────────────────────
+let _approveTargetId = null;
+function handleApprove(id) {
+  _approveTargetId = id;
+  openModal("approve-modal");
+}
+async function _confirmApprove() {
+  if (!_approveTargetId) return;
+  const id = _approveTargetId;
+  closeModal("approve-modal");
+  _approveTargetId = null;
   try {
     await api("POST", { action: "approve", id });
     toast("Urlaub genehmigt und im Team-Kalender eingetragen", "ok");
@@ -693,6 +734,27 @@ function bindUi() {
   els.btnRejectCancel.addEventListener("click", closeRejectModal);
   els.rejectModal.addEventListener("click", (e) => {
     if (e.target === els.rejectModal) closeRejectModal();
+  });
+
+  // Approve-Modal
+  document.getElementById("btn-approve-confirm")?.addEventListener("click", () => void _confirmApprove());
+  document.getElementById("btn-approve-cancel")?.addEventListener("click", () => closeModal("approve-modal"));
+  document.getElementById("approve-modal")?.addEventListener("click", (e) => {
+    if (e.target === document.getElementById("approve-modal")) closeModal("approve-modal");
+  });
+
+  // Withdraw-Modal
+  document.getElementById("btn-withdraw-confirm")?.addEventListener("click", () => void _confirmWithdraw());
+  document.getElementById("btn-withdraw-cancel")?.addEventListener("click", () => closeModal("withdraw-modal"));
+  document.getElementById("withdraw-modal")?.addEventListener("click", (e) => {
+    if (e.target === document.getElementById("withdraw-modal")) closeModal("withdraw-modal");
+  });
+
+  // Cancel-Modal
+  document.getElementById("btn-cancel-confirm")?.addEventListener("click", () => void _confirmCancel());
+  document.getElementById("btn-cancel-cancel")?.addEventListener("click", () => closeModal("cancel-modal"));
+  document.getElementById("cancel-modal")?.addEventListener("click", (e) => {
+    if (e.target === document.getElementById("cancel-modal")) closeModal("cancel-modal");
   });
   if (els.closureYear) {
     els.closureYear.addEventListener("change", () => {
