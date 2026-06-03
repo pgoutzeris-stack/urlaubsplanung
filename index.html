@@ -305,8 +305,13 @@
       background: var(--bg); border-radius: var(--radius); box-shadow: var(--shadow-modal);
       width: 100%; max-width: 420px; padding: 1.75rem;
     }
-    .modal-box h2 { font-size: 1.15rem; margin-bottom: .5rem; }
-    .modal-box p { color: var(--muted); font-size: .9rem; margin-bottom: 1rem; }
+    .modal-box h2 { font-size: 1.05rem; font-weight: 700; margin: 0 0 .4rem; color: var(--ink); }
+    .modal-box p { color: var(--muted); font-size: .875rem; line-height: 1.55; margin-bottom: 1.1rem; }
+    .modal-icon { width:46px;height:46px;border-radius:12px;display:flex;align-items:center;justify-content:center;font-size:1.1rem;margin:0 auto .9rem; }
+    .modal-icon.success { background:#f0fdf4; color:#16a34a; }
+    .modal-icon.danger  { background:#fef2f2; color:#dc2626; }
+    .modal-icon.warning { background:#fffbeb; color:#d97706; }
+    .modal-icon.info    { background:#eff6ff; color:#3b82f6; }
     .modal-box.modal-box--wide {
       max-width: min(680px, calc(100vw - 2rem));
       width: min(680px, calc(100vw - 2rem));
@@ -329,11 +334,13 @@
         width: calc(100vw - 1rem);
       }
     }
-    .modal-actions { display: flex; gap: .65rem; margin-top: 1rem; }
+    .modal-actions { display: flex; gap: .65rem; margin-top: 1.1rem; }
     .btn-secondary {
-      flex: 1; padding: .7rem 1rem; background: var(--status-bg); border: 1px solid var(--line);
-      border-radius: var(--radius-pill); font-family: inherit; font-weight: 500; color: var(--muted); cursor: pointer;
+      flex: 1; padding: .75rem 1rem; background: transparent; border: 1px solid var(--line);
+      border-radius: 10px; font-family: inherit; font-weight: 600; font-size: .875rem;
+      color: var(--ink); cursor: pointer; transition: all .15s;
     }
+    .btn-secondary:hover { border-color: var(--brand); color: var(--brand); background: rgba(32,110,251,.04); }
     .btn-secondary:hover { border-color: var(--brand); color: var(--brand); }
 
     #toast-container {
@@ -610,12 +617,13 @@
 
 <div class="modal-overlay" id="reject-modal" aria-hidden="true">
   <div class="modal-box" role="dialog" aria-labelledby="reject-title">
-    <h2 id="reject-title">Antrag ablehnen</h2>
-    <p>Optional kannst du einen Grund angeben.</p>
+    <div class="modal-icon danger"><i class="fa-solid fa-xmark"></i></div>
+    <h2 id="reject-title" style="text-align:center">Antrag ablehnen</h2>
+    <p style="text-align:center">Optional kannst du einen Grund angeben.</p>
     <textarea id="reject-reason" placeholder="Grund für die Ablehnung …"></textarea>
     <div class="modal-actions">
       <button type="button" class="btn-secondary" id="btn-reject-cancel">Abbrechen</button>
-      <button type="button" class="btn-primary" id="btn-reject-confirm" style="flex:1.2;margin-top:0">
+      <button type="button" class="btn-primary" id="btn-reject-confirm" style="flex:1.2;margin-top:0;background:#dc2626;border-radius:10px;padding:.75rem 1rem">
         <i class="fa-solid fa-xmark"></i> Ablehnen
       </button>
     </div>
@@ -625,11 +633,12 @@
 <!-- Genehmigen-Modal -->
 <div class="modal-overlay" id="approve-modal" aria-hidden="true">
   <div class="modal-box" role="dialog" aria-labelledby="approve-modal-title">
-    <h2 id="approve-modal-title"><i class="fa-solid fa-check" style="color:var(--c-success,#16a34a);margin-right:.4rem"></i>Urlaub genehmigen</h2>
-    <p id="approve-modal-text">Urlaub genehmigen und im Team-Kalender eintragen?</p>
+    <div class="modal-icon success"><i class="fa-solid fa-check"></i></div>
+    <h2 id="approve-modal-title" style="text-align:center">Urlaub genehmigen</h2>
+    <p id="approve-modal-text" style="text-align:center">Urlaub genehmigen und im Team-Kalender eintragen?</p>
     <div class="modal-actions">
       <button type="button" class="btn-secondary" id="btn-approve-cancel">Abbrechen</button>
-      <button type="button" class="btn-primary" id="btn-approve-confirm" style="flex:1.2;margin-top:0;background:var(--c-success,#16a34a)">
+      <button type="button" class="btn-primary" id="btn-approve-confirm" style="flex:1.2;margin-top:0;background:#16a34a;border-radius:10px;padding:.75rem 1rem">
         <i class="fa-solid fa-check"></i> Genehmigen
       </button>
     </div>
@@ -639,11 +648,12 @@
 <!-- Zurückziehen-Modal -->
 <div class="modal-overlay" id="withdraw-modal" aria-hidden="true">
   <div class="modal-box" role="dialog" aria-labelledby="withdraw-modal-title">
-    <h2 id="withdraw-modal-title">Antrag zurückziehen</h2>
-    <p>Möchtest du deinen ausstehenden Urlaubsantrag wirklich zurückziehen?</p>
+    <div class="modal-icon info"><i class="fa-solid fa-rotate-left"></i></div>
+    <h2 id="withdraw-modal-title" style="text-align:center">Antrag zurückziehen</h2>
+    <p style="text-align:center">Möchtest du deinen ausstehenden Urlaubsantrag wirklich zurückziehen?</p>
     <div class="modal-actions">
       <button type="button" class="btn-secondary" id="btn-withdraw-cancel">Abbrechen</button>
-      <button type="button" class="btn-primary" id="btn-withdraw-confirm" style="flex:1.2;margin-top:0">
+      <button type="button" class="btn-primary" id="btn-withdraw-confirm" style="flex:1.2;margin-top:0;border-radius:10px;padding:.75rem 1rem">
         <i class="fa-solid fa-rotate-left"></i> Zurückziehen
       </button>
     </div>
@@ -653,11 +663,12 @@
 <!-- Stornieren-Modal -->
 <div class="modal-overlay" id="cancel-modal" aria-hidden="true">
   <div class="modal-box" role="dialog" aria-labelledby="cancel-modal-title">
-    <h2 id="cancel-modal-title">Urlaub stornieren</h2>
-    <p>Genehmigten Urlaub wirklich stornieren? Der Kalendereintrag wird entfernt und die Urlaubstage werden wieder gutgeschrieben.</p>
+    <div class="modal-icon warning"><i class="fa-solid fa-ban"></i></div>
+    <h2 id="cancel-modal-title" style="text-align:center">Urlaub stornieren</h2>
+    <p style="text-align:center">Genehmigten Urlaub wirklich stornieren? Der Kalendereintrag wird entfernt und die Urlaubstage werden wieder gutgeschrieben.</p>
     <div class="modal-actions">
       <button type="button" class="btn-secondary" id="btn-cancel-cancel">Abbrechen</button>
-      <button type="button" class="btn-primary" id="btn-cancel-confirm" style="flex:1.2;margin-top:0;background:var(--c-danger,#dc2626)">
+      <button type="button" class="btn-primary" id="btn-cancel-confirm" style="flex:1.2;margin-top:0;background:#d97706;border-radius:10px;padding:.75rem 1rem">
         <i class="fa-solid fa-ban"></i> Stornieren
       </button>
     </div>
