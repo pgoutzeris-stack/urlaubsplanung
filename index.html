@@ -7,6 +7,7 @@
   <link rel="stylesheet" href="https://fonts.cdnfonts.com/css/circular-std" />
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css" crossorigin="anonymous" />
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <script async src="https://pgoutzeris-stack.github.io/ROOTS_Intranet/roots-user-bridge.js?v=20260522-hover"></script>
   <style>
     :root {
       --brand: #206efb; --brand-dark: #165fd9; --brand-light: #eff6ff;
@@ -702,7 +703,6 @@ window.RootsUser = window.RootsUser || {
   isAdmin(){return this._p?.app_role==='admin'},
 };
 </script>
-<script src="https://pgoutzeris-stack.github.io/ROOTS_Intranet/roots-user-bridge.js?v=20260522-hover"></script>
 
 <script type="module">
 import { SB_URL, SB_ANON } from './config.js';
@@ -737,6 +737,10 @@ sb.auth.getSession().then(({ data: { session } }) => onSession(session));
 sb.auth.onAuthStateChange((event, session) => {
   if (event === 'SIGNED_OUT') { showLogin(); return; }
   if (session) onSession(session);
+});
+// Bridge (Intranet iframe): session kommt via roots-auth-ready Event
+window.addEventListener('roots-auth-ready', (e) => {
+  if (e.detail?.session) onSession(e.detail.session);
 });
 
 document.getElementById('form-login').addEventListener('submit', async (e) => {
