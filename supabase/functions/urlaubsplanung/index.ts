@@ -104,15 +104,257 @@ function rowOut(r: Record<string, unknown>) {
     applicant_name: r.applicant_name,
     start_date: r.start_date,
     end_date: r.end_date,
+    day_part: r.day_part ?? "full",
     note: r.note,
     status: r.status,
     reviewed_by: r.reviewed_by,
     reviewed_at: r.reviewed_at,
     rejection_reason: r.rejection_reason,
+    team_member_id: r.team_member_id ?? null,
     calendar_event_id: r.calendar_event_id,
     created_at: r.created_at,
     updated_at: r.updated_at,
+    overlap: r.overlap ?? null,
   };
+}
+
+type UrlaubRequestRow = {
+  id: string;
+  user_id: string;
+  applicant_name?: string | null;
+  start_date: string;
+  end_date: string;
+  day_part?: string | null;
+  note?: string | null;
+  status: string;
+  team_member_id?: string | null;
+  calendar_event_id?: string | null;
+  created_at?: string | null;
+  updated_at?: string | null;
+};
+
+type TeamMemberRow = {
+  id: string;
+  name?: string | null;
+  user_id?: string | null;
+  kuerzel?: string | null;
+};
+
+type TeamCalendarEventRow = {
+  id: string;
+  member_id?: string | null;
+  type?: string | null;
+  title?: string | null;
+  start_date: string;
+  end_date: string;
+  note?: string | null;
+  day_part?: string | null;
+  is_system?: boolean | null;
+  urlaub_request_id?: string | null;
+};
+
+type OverlapItem = {
+  id: string;
+  source: "request" | "calendar";
+  status?: string | null;
+  type?: string | null;
+  label: string;
+  member_name: string;
+  kuerzel: string | null;
+  start_date: string;
+  end_date: string;
+};
+
+type OverlapSummary = {
+  level: "clear" | "team_overlap" | "conflict";
+  has_conflict: boolean;
+  conflict_count: number;
+  team_overlap_count: number;
+  summary: string;
+  items: OverlapItem[];
+};
+
+function statusLabel(status: string | null | undefined): string {
+  if (status === "approved") return "Genehmigt";
+  if (status === "pending") return "Ausstehend";
+  if (status === "rejected") return "Abgelehnt";
+  if (status === "cancelled") return "Storniert";
+  if (status === "withdrawn") return "Zurückgezogen";
+  return "Kalender";
+}
+
+function calendarTypeLabel(type: string | null | undefined, isSystem?: boolean | null): string {
+  const t = String(type || "").toLowerCase();
+  if (isSystem) return "Firmenfrei";
+  if (t === "urlaub") return "Urlaub";
+  if (t === "krank" || t === "sick") return "Krank";
+  if (t.includes("home")) return "Homeoffice";
+  if (t) return type || "Kalender";
+  return "Kalender";
+}
+
+function memberName(member?: TeamMemberRow | null, fallback?: string | null): string {
+  return (member?.name || fallback || "Unbekannt").trim();
+}
+
+function memberKuerzel(member?: TeamMemberRow | null, fallbackName?: string | null): string | null {
+  if (member?.kuerzel) return deriveKuerzel(member.name || fallbackName || "", member.kuerzel);
+  const name = (member?.name || fallbackName || "").trim();
+  return name ? deriveKuerzel(name, null) : null;
+}
+
+async function loadTeamMembers(
+  kalender: ReturnType<typeof createClient>,
+): Promise<{
+  rows: TeamMemberRow[];
+  byId: Map<string, TeamMemberRow>;
+  byUserId: Map<string, TeamMemberRow>;
+}> {
+  const { data, error } = await kalender
+    .from("team_members")
+    .select("id,name,user_id,kuerzel")
+    .order("name");
+  if (error) throw error;
+  const rows = (data ?? []) as TeamMemberRow[];
+  const byId = new Map<string, TeamMemberRow>();
+  const byUserId = new Map<string, TeamMemberRow>();
+  for (const row of rows) {
+    if (row.id) byId.set(String(row.id), row);
+    if (row.user_id) byUserId.set(String(row.user_id), row);
+  }
+  return { rows, byId, byUserId };
+}
+
+function emptyOverlapSummary(): OverlapSummary {
+  return {
+    level: "clear",
+    has_conflict: false,
+    conflict_count: 0,
+    team_overlap_count: 0,
+    summary: "Keine Überschneidung",
+    items: [],
+  };
+}
+
+function requestOverlapItem(row: UrlaubRequestRow): OverlapItem {
+  const name = (row.applicant_name || "Unbekannt").trim();
+  return {
+    id: row.id,
+    source: "request",
+    status: row.status,
+    label: `${name} · ${statusLabel(row.status)}`,
+    member_name: name,
+    kuerzel: deriveKuerzel(name, null),
+    start_date: row.start_date,
+    end_date: row.end_date,
+  };
+}
+
+function calendarOverlapItem(
+  row: TeamCalendarEventRow,
+  member?: TeamMemberRow | null,
+): OverlapItem {
+  const name = memberName(member, row.title);
+  const typeLabel = calendarTypeLabel(row.type, row.is_system);
+  return {
+    id: row.id,
+    source: "calendar",
+    type: row.type || null,
+    label: `${name} · ${typeLabel}`,
+    member_name: name,
+    kuerzel: memberKuerzel(member, name),
+    start_date: row.start_date,
+    end_date: row.end_date,
+  };
+}
+
+function formatOverlapSummary(
+  level: OverlapSummary["level"],
+  conflicts: OverlapItem[],
+  teamOverlaps: OverlapItem[],
+): string {
+  const first = conflicts[0] || teamOverlaps[0];
+  if (!first) return "Keine Überschneidung";
+  const range = `${formatDeYmd(first.start_date)} – ${formatDeYmd(first.end_date)}`;
+  if (level === "conflict") return `Konflikt mit ${first.label} (${range})`;
+  return `${teamOverlaps.length} Team-Überlappung${teamOverlaps.length === 1 ? "" : "en"}`;
+}
+
+function buildRequestOverlapMap(
+  pendingRows: UrlaubRequestRow[],
+  activeRows: UrlaubRequestRow[],
+  eventRows: TeamCalendarEventRow[],
+  membersById: Map<string, TeamMemberRow>,
+  membersByUserId: Map<string, TeamMemberRow>,
+): Map<string, OverlapSummary> {
+  const activeIds = new Set(activeRows.map((row) => String(row.id)));
+  const result = new Map<string, OverlapSummary>();
+
+  for (const req of pendingRows) {
+    const conflicts: OverlapItem[] = [];
+    const teamOverlaps: OverlapItem[] = [];
+    const seenConflicts = new Set<string>();
+    const seenTeam = new Set<string>();
+    const reqMember = req.team_member_id
+      ? membersById.get(String(req.team_member_id))
+      : membersByUserId.get(String(req.user_id));
+    const reqMemberId = reqMember?.id || req.team_member_id || null;
+
+    const pushUnique = (
+      bucket: OverlapItem[],
+      seen: Set<string>,
+      item: OverlapItem,
+    ) => {
+      const key = `${item.source}:${item.id}`;
+      if (seen.has(key)) return;
+      seen.add(key);
+      bucket.push(item);
+    };
+
+    for (const other of activeRows) {
+      if (other.id === req.id) continue;
+      if (other.status !== "pending" && other.status !== "approved") continue;
+      if (!rangesOverlap(req.start_date, req.end_date, other.start_date, other.end_date)) continue;
+      const item = requestOverlapItem(other);
+      if (other.user_id === req.user_id) {
+        pushUnique(conflicts, seenConflicts, item);
+      } else {
+        pushUnique(teamOverlaps, seenTeam, item);
+      }
+    }
+
+    for (const event of eventRows) {
+      if (event.urlaub_request_id === req.id) continue;
+      if (event.urlaub_request_id && activeIds.has(String(event.urlaub_request_id))) continue;
+      if (!rangesOverlap(req.start_date, req.end_date, event.start_date, event.end_date)) continue;
+      const member = event.member_id ? membersById.get(String(event.member_id)) : null;
+      const sameMember =
+        (reqMemberId && event.member_id && String(event.member_id) === String(reqMemberId)) ||
+        (member?.user_id && member.user_id === req.user_id);
+      const item = calendarOverlapItem(event, member);
+      if (sameMember) {
+        pushUnique(conflicts, seenConflicts, item);
+      } else {
+        pushUnique(teamOverlaps, seenTeam, item);
+      }
+    }
+
+    const level: OverlapSummary["level"] = conflicts.length
+      ? "conflict"
+      : teamOverlaps.length
+        ? "team_overlap"
+        : "clear";
+    result.set(req.id, {
+      level,
+      has_conflict: conflicts.length > 0,
+      conflict_count: conflicts.length,
+      team_overlap_count: teamOverlaps.length,
+      summary: formatOverlapSummary(level, conflicts, teamOverlaps),
+      items: [...conflicts, ...teamOverlaps].slice(0, 6),
+    });
+  }
+
+  return result;
 }
 
 function countDays(start: string, end: string): number {
@@ -516,6 +758,171 @@ async function buildTeamOverview(
   return { year, team: rows };
 }
 
+async function buildAdminRequestList(
+  service: ReturnType<typeof createClient>,
+  kalender: ReturnType<typeof createClient>,
+  rows: UrlaubRequestRow[],
+) {
+  const pendingRows = rows.filter((row) => row.status === "pending");
+  if (!pendingRows.length) return rows.map((row) => rowOut(row as unknown as Record<string, unknown>));
+
+  const conflictStart = pendingRows.reduce(
+    (min, row) => (row.start_date < min ? row.start_date : min),
+    pendingRows[0].start_date,
+  );
+  const conflictEnd = pendingRows.reduce(
+    (max, row) => (row.end_date > max ? row.end_date : max),
+    pendingRows[0].end_date,
+  );
+
+  const { data: activeData, error: activeErr } = await service
+    .from("urlaub_requests")
+    .select("id,user_id,applicant_name,start_date,end_date,day_part,status,team_member_id,calendar_event_id")
+    .in("status", ["pending", "approved"]);
+  if (activeErr) throw activeErr;
+
+  const { data: eventData, error: eventErr } = await kalender
+    .from("events")
+    .select("id,member_id,type,title,start_date,end_date,note,day_part,is_system,urlaub_request_id")
+    .lte("start_date", conflictEnd)
+    .gte("end_date", conflictStart);
+  if (eventErr) throw eventErr;
+
+  const members = await loadTeamMembers(kalender);
+  const overlapMap = buildRequestOverlapMap(
+    pendingRows,
+    (activeData ?? []) as UrlaubRequestRow[],
+    (eventData ?? []) as TeamCalendarEventRow[],
+    members.byId,
+    members.byUserId,
+  );
+
+  return rows.map((row) =>
+    rowOut({
+      ...(row as unknown as Record<string, unknown>),
+      overlap: row.status === "pending" ? overlapMap.get(row.id) || emptyOverlapSummary() : null,
+    })
+  );
+}
+
+function isYmd(value: string): boolean {
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(value)) return false;
+  return !Number.isNaN(parseYmd(value).getTime());
+}
+
+function calendarItemFromEvent(
+  row: TeamCalendarEventRow,
+  member?: TeamMemberRow | null,
+) {
+  const name = memberName(member, row.title);
+  const typeLabel = calendarTypeLabel(row.type, row.is_system);
+  return {
+    id: `event:${row.id}`,
+    source: "calendar",
+    event_id: row.id,
+    title: row.title || typeLabel,
+    member_name: name,
+    kuerzel: memberKuerzel(member, name),
+    start_date: row.start_date,
+    end_date: row.end_date,
+    day_part: row.day_part || "full",
+    status: row.is_system ? "system" : row.type === "urlaub" ? "approved" : "calendar",
+    type: row.type || null,
+    is_system: Boolean(row.is_system),
+    note: row.note || null,
+    urlaub_request_id: row.urlaub_request_id || null,
+  };
+}
+
+function calendarItemFromRequest(row: UrlaubRequestRow, overlap: OverlapSummary) {
+  const name = (row.applicant_name || "Unbekannt").trim();
+  return {
+    id: `request:${row.id}`,
+    source: "request",
+    request_id: row.id,
+    title: "Urlaubsanfrage",
+    member_name: name,
+    kuerzel: deriveKuerzel(name, null),
+    start_date: row.start_date,
+    end_date: row.end_date,
+    day_part: row.day_part || "full",
+    status: row.status,
+    note: row.note || null,
+    overlap,
+  };
+}
+
+async function buildTeamCalendarView(
+  service: ReturnType<typeof createClient>,
+  kalender: ReturnType<typeof createClient>,
+  from: string,
+  to: string,
+) {
+  if (!isYmd(from) || !isYmd(to) || to < from) {
+    throw new Error("Ungültiger Kalenderzeitraum");
+  }
+
+  const { data: pendingData, error: pendingErr } = await service
+    .from("urlaub_requests")
+    .select("id,user_id,applicant_name,start_date,end_date,day_part,note,status,team_member_id,calendar_event_id,created_at")
+    .eq("status", "pending")
+    .lte("start_date", to)
+    .gte("end_date", from)
+    .order("start_date");
+  if (pendingErr) throw pendingErr;
+
+  const pendingRows = (pendingData ?? []) as UrlaubRequestRow[];
+  const conflictStart = pendingRows.reduce(
+    (min, row) => (row.start_date < min ? row.start_date : min),
+    from,
+  );
+  const conflictEnd = pendingRows.reduce(
+    (max, row) => (row.end_date > max ? row.end_date : max),
+    to,
+  );
+
+  const { data: eventData, error: eventErr } = await kalender
+    .from("events")
+    .select("id,member_id,type,title,start_date,end_date,note,day_part,is_system,urlaub_request_id")
+    .lte("start_date", conflictEnd)
+    .gte("end_date", conflictStart)
+    .order("start_date");
+  if (eventErr) throw eventErr;
+
+  const { data: activeData, error: activeErr } = await service
+    .from("urlaub_requests")
+    .select("id,user_id,applicant_name,start_date,end_date,day_part,status,team_member_id,calendar_event_id")
+    .in("status", ["pending", "approved"]);
+  if (activeErr) throw activeErr;
+
+  const members = await loadTeamMembers(kalender);
+  const eventRows = (eventData ?? []) as TeamCalendarEventRow[];
+  const overlapMap = buildRequestOverlapMap(
+    pendingRows,
+    (activeData ?? []) as UrlaubRequestRow[],
+    eventRows,
+    members.byId,
+    members.byUserId,
+  );
+
+  const items = [
+    ...eventRows
+      .filter((event) => rangesOverlap(from, to, event.start_date, event.end_date))
+      .map((event) => calendarItemFromEvent(
+        event,
+        event.member_id ? members.byId.get(String(event.member_id)) : null,
+      )),
+    ...pendingRows.map((row) =>
+      calendarItemFromRequest(row, overlapMap.get(row.id) || emptyOverlapSummary())
+    ),
+  ].sort((a, b) =>
+    a.start_date.localeCompare(b.start_date) ||
+    String(a.member_name).localeCompare(String(b.member_name), "de")
+  );
+
+  return { from, to, items };
+}
+
 async function loadStaffSettings(service: ReturnType<typeof createClient>) {
   const { data, error } = await service
     .schema("users")
@@ -742,7 +1149,11 @@ Deno.serve(async (req) => {
           .select("*")
           .order("created_at", { ascending: false });
         if (error) throw error;
-        return json((data ?? []).map((r) => rowOut(r as Record<string, unknown>)), 200, c);
+        return json(
+          await buildAdminRequestList(service, kalender, (data ?? []) as UrlaubRequestRow[]),
+          200,
+          c,
+        );
       }
       if (scope === "closures") {
         if (!isAdmin) return json({ error: "Keine Berechtigung" }, 403, c);
@@ -759,6 +1170,12 @@ Deno.serve(async (req) => {
         if (!isAdmin) return json({ error: "Keine Berechtigung" }, 403, c);
         const year = Number(params.get("year") || yearNow);
         return json(await buildTeamOverview(service, kalender, year), 200, c);
+      }
+      if (scope === "team_calendar") {
+        if (!isAdmin) return json({ error: "Keine Berechtigung" }, 403, c);
+        const from = params.get("from") || `${yearNow}-01-01`;
+        const to = params.get("to") || `${yearNow}-12-31`;
+        return json(await buildTeamCalendarView(service, kalender, from, to), 200, c);
       }
       if (scope === "staff") {
         if (!isAdmin) return json({ error: "Keine Berechtigung" }, 403, c);

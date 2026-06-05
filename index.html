@@ -181,6 +181,18 @@
     .req-note, .req-reject-reason, .req-cal-hint { font-size: .88rem; color: var(--muted); margin-top: .5rem; line-height: 1.45; }
     .req-cal-hint { color: var(--success); }
     .req-reject-reason { color: var(--danger); }
+    .req-card--conflict { border-color: rgba(220,38,38,.42); box-shadow: inset 3px 0 0 var(--danger); }
+    .req-card--team_overlap { border-color: rgba(245,158,11,.42); box-shadow: inset 3px 0 0 var(--warn); }
+    .req-overlap {
+      margin-top: .75rem; border-radius: 10px; padding: .7rem .8rem;
+      border: 1px solid var(--line); background: var(--bg); font-size: .82rem;
+    }
+    .req-overlap--clear { border-color: rgba(16,185,129,.22); background: var(--success-light); color: var(--success); }
+    .req-overlap--team_overlap { border-color: rgba(245,158,11,.32); background: var(--warn-light); color: #b45309; }
+    .req-overlap--conflict { border-color: rgba(220,38,38,.34); background: var(--danger-light); color: var(--danger); }
+    .req-overlap-head { display: flex; align-items: center; gap: .45rem; line-height: 1.35; }
+    .req-overlap-details { display: flex; flex-direction: column; gap: .18rem; margin-top: .45rem; color: var(--muted); }
+    .req-overlap-details small { font-weight: 700; color: inherit; }
     .status-pill {
       display: inline-flex; align-items: center; gap: 5px; font-size: .75rem; font-weight: 700;
       padding: .3rem .65rem; border-radius: 999px; white-space: nowrap;
@@ -270,6 +282,87 @@
     .team-progress-approved { background: #16a34a; }
     .team-progress-pending  { background: #86efac; }
     .team-progress > span { display: block; height: 100%; border-radius: 999px; background: linear-gradient(90deg, var(--brand), #60a5fa); }
+
+    .team-calendar-panel { margin-bottom: 1.25rem; }
+    .team-calendar-head {
+      display: flex; align-items: flex-start; justify-content: space-between; gap: 1rem; margin-bottom: .85rem;
+    }
+    .team-calendar-meta { display: flex; align-items: center; flex-wrap: wrap; gap: .65rem; color: var(--muted); font-size: .82rem; }
+    .team-live-status {
+      display: inline-flex; align-items: center; gap: .38rem; padding: .22rem .55rem; border-radius: 999px;
+      border: 1px solid var(--line); background: var(--status-bg); font-size: .75rem; font-weight: 700; color: var(--muted);
+    }
+    .team-live-status > span {
+      width: .46rem; height: .46rem; border-radius: 50%; background: #94a3b8; display: inline-block;
+    }
+    .team-live-status[data-state="live"] { color: var(--success); border-color: rgba(16,185,129,.28); background: var(--success-light); }
+    .team-live-status[data-state="live"] > span { background: var(--success); box-shadow: 0 0 0 4px rgba(16,185,129,.12); }
+    .team-live-status[data-state="fallback"] { color: #b45309; border-color: rgba(245,158,11,.32); background: var(--warn-light); }
+    .team-live-status[data-state="fallback"] > span { background: var(--warn); }
+    .team-calendar-controls { display: flex; align-items: center; gap: .45rem; flex-shrink: 0; }
+    .team-calendar-controls strong { min-width: 8.8rem; text-align: center; font-size: .92rem; }
+    .team-calendar-icon-btn {
+      width: 36px; height: 36px; border: 1px solid var(--line); border-radius: 50%;
+      background: var(--bg); color: var(--muted); display: inline-flex; align-items: center; justify-content: center;
+      cursor: pointer; font-family: inherit; transition: all .15s;
+    }
+    .team-calendar-icon-btn:hover { border-color: var(--brand); color: var(--brand); background: var(--brand-light); }
+    .team-calendar-legend {
+      display: flex; align-items: center; flex-wrap: wrap; gap: .45rem .8rem;
+      color: var(--muted); font-size: .76rem; font-weight: 700; margin-bottom: .75rem;
+    }
+    .legend-dot { width: .55rem; height: .55rem; border-radius: 50%; display: inline-block; }
+    .legend-dot--pending { background: var(--warn); }
+    .legend-dot--approved { background: var(--success); }
+    .legend-dot--conflict { background: var(--danger); }
+    .legend-dot--system { background: #64748b; }
+    .team-calendar-shell { overflow-x: auto; border: 1px solid var(--line); border-radius: 12px; background: var(--bg); }
+    .team-calendar-weekdays, .team-calendar-grid {
+      display: grid; grid-template-columns: repeat(7, minmax(104px, 1fr)); min-width: 760px;
+    }
+    .team-calendar-weekdays {
+      border-bottom: 1px solid var(--line); background: var(--status-bg); color: var(--muted);
+      font-size: .72rem; font-weight: 800; text-transform: uppercase;
+    }
+    .team-calendar-weekdays span { padding: .55rem .7rem; border-right: 1px solid var(--line); }
+    .team-calendar-weekdays span:last-child { border-right: none; }
+    .team-cal-day {
+      min-height: 112px; padding: .55rem; border-right: 1px solid var(--line); border-bottom: 1px solid var(--line);
+      background: var(--bg); display: flex; flex-direction: column; gap: .4rem;
+    }
+    .team-cal-day:nth-child(7n) { border-right: none; }
+    .team-cal-day:nth-last-child(-n+7) { border-bottom: none; }
+    .team-cal-day.is-outside { background: var(--status-bg); color: var(--muted); }
+    .team-cal-day.is-today { box-shadow: inset 0 0 0 2px rgba(32,110,251,.38); }
+    .team-cal-date {
+      width: 1.55rem; height: 1.55rem; display: inline-flex; align-items: center; justify-content: center;
+      border-radius: 50%; font-size: .78rem; font-weight: 800; color: var(--muted);
+    }
+    .team-cal-day.is-today .team-cal-date { background: var(--brand); color: #fff; }
+    .team-cal-items { display: flex; flex-direction: column; gap: .25rem; min-height: 0; }
+    .team-cal-chip {
+      min-height: 23px; display: flex; align-items: center; gap: .32rem; border-radius: 7px;
+      padding: .22rem .42rem; border: 1px solid transparent; font-size: .72rem; font-weight: 800;
+      white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+    }
+    .team-cal-chip i { font-size: .68rem; flex-shrink: 0; }
+    .team-cal-chip span { overflow: hidden; text-overflow: ellipsis; }
+    .team-cal-chip--pending { color: #b45309; background: var(--warn-light); border-color: rgba(245,158,11,.24); }
+    .team-cal-chip--approved { color: var(--success); background: var(--success-light); border-color: rgba(16,185,129,.22); }
+    .team-cal-chip--system { color: #475569; background: #f1f5f9; border-color: rgba(100,116,139,.22); }
+    .team-cal-chip--other { color: var(--brand); background: var(--brand-light); border-color: rgba(32,110,251,.18); }
+    .team-cal-chip.has-conflict { color: var(--danger); background: var(--danger-light); border-color: rgba(220,38,38,.35); }
+    .team-cal-chip.has-team-overlap { box-shadow: inset 3px 0 0 var(--warn); }
+    .team-cal-more { font-size: .72rem; font-weight: 800; color: var(--muted); padding: .08rem .35rem; }
+    @media (prefers-color-scheme: dark) {
+      .team-cal-chip--system { background: #1e293b; color: #cbd5e1; border-color: #334155; }
+      .req-overlap-details { color: #cbd5e1; }
+    }
+    @media (max-width: 760px) {
+      .team-calendar-head { flex-direction: column; }
+      .team-calendar-controls { width: 100%; justify-content: space-between; }
+      .team-calendar-controls strong { flex: 1; min-width: 0; }
+    }
 
     .settings-hint {
       display: flex; gap: .75rem; align-items: flex-start; padding: .9rem 1rem; margin-bottom: 1.1rem;
@@ -563,6 +656,35 @@
           <div class="stat-value" id="admin-team-count">0</div>
         </div>
       </div>
+      <section class="panel team-calendar-panel">
+        <div class="team-calendar-head">
+          <div>
+            <h2 class="panel-title"><i class="fa-solid fa-calendar-days"></i> Live Team-Kalender</h2>
+            <div class="team-calendar-meta">
+              <span id="team-calendar-summary">0 offene Anfragen · 0 Konflikte</span>
+              <span class="team-live-status" id="team-calendar-live-status" data-state="idle"><span aria-hidden="true"></span>Auto-Refresh</span>
+            </div>
+          </div>
+          <div class="team-calendar-controls" aria-label="Kalendermonat">
+            <button type="button" class="team-calendar-icon-btn" id="team-calendar-prev" title="Vorheriger Monat" aria-label="Vorheriger Monat"><i class="fa-solid fa-chevron-left"></i></button>
+            <button type="button" class="team-calendar-icon-btn" id="team-calendar-today" title="Heute" aria-label="Heute"><i class="fa-solid fa-calendar-day"></i></button>
+            <strong id="team-calendar-month-label">Juni 2026</strong>
+            <button type="button" class="team-calendar-icon-btn" id="team-calendar-next" title="Nächster Monat" aria-label="Nächster Monat"><i class="fa-solid fa-chevron-right"></i></button>
+          </div>
+        </div>
+        <div class="team-calendar-legend" aria-hidden="true">
+          <span class="legend-dot legend-dot--pending"></span> Offen
+          <span class="legend-dot legend-dot--approved"></span> Genehmigt
+          <span class="legend-dot legend-dot--conflict"></span> Konflikt
+          <span class="legend-dot legend-dot--system"></span> Firmenfrei
+        </div>
+        <div class="team-calendar-shell">
+          <div class="team-calendar-weekdays" aria-hidden="true">
+            <span>Mo</span><span>Di</span><span>Mi</span><span>Do</span><span>Fr</span><span>Sa</span><span>So</span>
+          </div>
+          <div class="team-calendar-grid" id="admin-team-calendar"></div>
+        </div>
+      </section>
       <div class="admin-layout-grid">
         <section class="panel">
           <h2 class="panel-title"><i class="fa-solid fa-users"></i> Urlaubskontingent Team</h2>
