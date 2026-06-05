@@ -23,6 +23,7 @@ let teamCalendarMonth = new Date(new Date().getFullYear(), new Date().getMonth()
 let teamCalendar = { from: "", to: "", items: [] };
 let realtimeChannel = null;
 let liveRefreshHandle = null;
+let highlightedCalendarRequestId = null;
 
 const els = {};
 
@@ -346,6 +347,9 @@ function calendarChipClass(item) {
   else classes.push("team-cal-chip--other");
   if (item.overlap?.level === "conflict") classes.push("has-conflict");
   if (item.overlap?.level === "team_overlap") classes.push("has-team-overlap");
+  if (item.source === "request" && item.request_id === highlightedCalendarRequestId) {
+    classes.push("is-highlighted");
+  }
   return classes.join(" ");
 }
 
@@ -366,7 +370,9 @@ function calendarChipTitle(item) {
 
 function renderCalendarChip(item) {
   const label = item.kuerzel || (item.member_name || "?").slice(0, 2).toUpperCase();
-  return `<div class="${calendarChipClass(item)}" title="${escapeHtml(calendarChipTitle(item))}">
+  const requestAttr =
+    item.source === "request" ? ` data-calendar-request-id="${escapeHtml(item.request_id)}"` : "";
+  return `<div class="${calendarChipClass(item)}"${requestAttr} title="${escapeHtml(calendarChipTitle(item))}">
     <i class="fa-solid ${calendarChipIcon(item)}"></i>
     <span>${escapeHtml(label)}</span>
   </div>`;
@@ -409,6 +415,9 @@ function renderTeamCalendar() {
     const cellClasses = ["team-cal-day"];
     if (day.slice(0, 7) !== currentMonth) cellClasses.push("is-outside");
     if (day === today) cellClasses.push("is-today");
+    if (dayItems.some((item) => item.source === "request" && item.request_id === highlightedCalendarRequestId)) {
+      cellClasses.push("has-highlighted-request");
+    }
     cells.push(`<div class="${cellClasses.join(" ")}">
       <div class="team-cal-date">${Number(day.slice(8, 10))}</div>
       <div class="team-cal-items">
@@ -433,6 +442,23 @@ async function shiftTeamCalendarMonth(delta) {
     1,
   );
   await loadTeamCalendar();
+}
+
+async function showRequestInTeamCalendar(id) {
+  const request = requests.find((row) => row.id === id);
+  if (!request) return;
+  highlightedCalendarRequestId = id;
+  const year = Number(String(request.start_date).slice(0, 4));
+  const month = Number(String(request.start_date).slice(5, 7)) - 1;
+  if (Number.isFinite(year) && Number.isFinite(month)) {
+    teamCalendarMonth = new Date(year, month, 1);
+  }
+  await loadTeamCalendar();
+  els.teamCalendarPanel?.scrollIntoView({ behavior: "smooth", block: "start" });
+  requestAnimationFrame(() => {
+    const chip = els.adminTeamCalendar?.querySelector(`[data-calendar-request-id="${id}"]`);
+    chip?.scrollIntoView({ behavior: "smooth", block: "center", inline: "center" });
+  });
 }
 
 async function openAdminSettingsModal() {
@@ -670,6 +696,7 @@ function renderRequestCard(r, { showActions = false, showUserActions = false } =
   const actions =
     showActions && r.status === "pending"
       ? `<div class="req-actions">
+          <button type="button" class="btn-show-calendar" data-show-calendar="${r.id}"><i class="fa-solid fa-calendar-days"></i> Teamkalender anzeigen</button>
           <button type="button" class="btn-approve" data-approve="${r.id}"><i class="fa-solid fa-check"></i> Genehmigen</button>
           <button type="button" class="btn-reject" data-reject="${r.id}"><i class="fa-solid fa-xmark"></i> Ablehnen</button>
         </div>`
@@ -736,6 +763,9 @@ function renderLists() {
 }
 
 function bindAdminActions(root) {
+  root.querySelectorAll("[data-show-calendar]").forEach((btn) => {
+    btn.addEventListener("click", () => void showRequestInTeamCalendar(btn.dataset.showCalendar));
+  });
   root.querySelectorAll("[data-approve]").forEach((btn) => {
     btn.addEventListener("click", () => void handleApprove(btn.dataset.approve));
   });
@@ -1035,12 +1065,6 @@ function bindUi() {
   if (els.teamCalendarNext) {
     els.teamCalendarNext.addEventListener("click", () => void shiftTeamCalendarMonth(1));
   }
-  if (els.teamCalendarToday) {
-    els.teamCalendarToday.addEventListener("click", () => {
-      teamCalendarMonth = new Date(new Date().getFullYear(), new Date().getMonth(), 1);
-      void loadTeamCalendar();
-    });
-  }
 
   document.addEventListener("roots-profile-ready", () => void bootApp());
 
@@ -1076,13 +1100,13 @@ function cacheEls() {
   els.adminTeamOverview = document.getElementById("admin-team-overview");
   els.adminTeamCount = document.getElementById("admin-team-count");
   els.teamOverviewYearLabel = document.getElementById("team-overview-year-label");
+  els.teamCalendarPanel = document.querySelector(".team-calendar-panel");
   els.adminTeamCalendar = document.getElementById("admin-team-calendar");
   els.teamCalendarMonthLabel = document.getElementById("team-calendar-month-label");
   els.teamCalendarSummary = document.getElementById("team-calendar-summary");
   els.teamCalendarLiveStatus = document.getElementById("team-calendar-live-status");
   els.teamCalendarPrev = document.getElementById("team-calendar-prev");
   els.teamCalendarNext = document.getElementById("team-calendar-next");
-  els.teamCalendarToday = document.getElementById("team-calendar-today");
   els.btnAdminSettings = document.getElementById("btn-admin-settings");
   els.adminSettingsModal = document.getElementById("admin-settings-modal");
   els.btnAdminSettingsClose = document.getElementById("btn-admin-settings-close");

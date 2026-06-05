@@ -20,7 +20,7 @@
       --app-max-w: 1400px; --app-side-pad: 1.5rem;
       --app-shell-w: min(var(--app-max-w), calc(100% - 2 * var(--app-side-pad)));
       --success: #10b981; --success-light: #ecfdf5;
-      --warn: #f59e0b; --warn-light: #fffbeb;
+      --warn: #206efb; --warn-light: #eff6ff;
       --danger: #dc2626; --danger-light: #fef2f2;
     }
     @media (prefers-color-scheme: dark) {
@@ -28,7 +28,7 @@
         --brand: #3b82f6; --brand-dark: #60a5fa; --brand-light: #1e3a8a;
         --ink: #f8fafc; --muted: #94a3b8; --bg: #0f172a; --line: #334155;
         --status-bg: #1e293b; --app-bg: #0b1220;
-        --success-light: #064e3b; --warn-light: #422006; --danger-light: #450a0a;
+        --success-light: #064e3b; --warn-light: #1e3a8a; --danger-light: #450a0a;
       }
     }
     *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
@@ -100,7 +100,7 @@
       font-size: .72rem; font-weight: 700; text-transform: uppercase; letter-spacing: .05em;
       padding: .35rem .65rem; border-radius: 999px; background: var(--brand-light); color: var(--brand);
     }
-    .role-badge--admin { background: var(--warn-light); color: #b45309; }
+    .role-badge--admin { background: var(--brand-light); color: var(--brand); }
     .dash-body { display: flex; flex: 1; min-height: 0; overflow: hidden; }
     .dash-sidebar {
       width: 260px; background: var(--bg); border-right: 1px solid var(--line);
@@ -182,13 +182,13 @@
     .req-cal-hint { color: var(--success); }
     .req-reject-reason { color: var(--danger); }
     .req-card--conflict { border-color: rgba(220,38,38,.42); box-shadow: inset 3px 0 0 var(--danger); }
-    .req-card--team_overlap { border-color: rgba(245,158,11,.42); box-shadow: inset 3px 0 0 var(--warn); }
+    .req-card--team_overlap { border-color: rgba(32,110,251,.34); box-shadow: inset 3px 0 0 var(--brand); }
     .req-overlap {
       margin-top: .75rem; border-radius: 10px; padding: .7rem .8rem;
       border: 1px solid var(--line); background: var(--bg); font-size: .82rem;
     }
     .req-overlap--clear { border-color: rgba(16,185,129,.22); background: var(--success-light); color: var(--success); }
-    .req-overlap--team_overlap { border-color: rgba(245,158,11,.32); background: var(--warn-light); color: #b45309; }
+    .req-overlap--team_overlap { border-color: rgba(32,110,251,.28); background: var(--brand-light); color: var(--brand); }
     .req-overlap--conflict { border-color: rgba(220,38,38,.34); background: var(--danger-light); color: var(--danger); }
     .req-overlap-head { display: flex; align-items: center; gap: .45rem; line-height: 1.35; }
     .req-overlap-details { display: flex; flex-direction: column; gap: .18rem; margin-top: .45rem; color: var(--muted); }
@@ -197,16 +197,18 @@
       display: inline-flex; align-items: center; gap: 5px; font-size: .75rem; font-weight: 700;
       padding: .3rem .65rem; border-radius: 999px; white-space: nowrap;
     }
-    .status--pending { background: var(--warn-light); color: #b45309; }
+    .status--pending { background: var(--brand-light); color: var(--brand); }
     .status--approved { background: var(--success-light); color: var(--success); }
     .status--rejected { background: var(--danger-light); color: var(--danger); }
     .status--withdrawn { background: #f1f5f9; color: #64748b; }
-    .status--cancelled { background: #fef3c7; color: #b45309; }
+    .status--cancelled { background: var(--danger-light); color: var(--danger); }
     .req-actions { display: flex; flex-wrap: wrap; gap: .5rem; margin-top: .85rem; }
-    .btn-approve, .btn-reject, .btn-withdraw, .btn-cancel-vacation {
+    .btn-approve, .btn-reject, .btn-withdraw, .btn-cancel-vacation, .btn-show-calendar {
       display: inline-flex; align-items: center; gap: 6px; padding: .55rem 1rem;
       border-radius: 999px; font-family: inherit; font-size: .85rem; font-weight: 600; cursor: pointer; border: none;
     }
+    .btn-show-calendar { background: var(--brand-light); border: 1px solid rgba(32,110,251,.24); color: var(--brand); }
+    .btn-show-calendar:hover { border-color: var(--brand); background: var(--bg); }
     .btn-approve { background: var(--success); color: #fff; }
     .btn-approve:hover { filter: brightness(1.05); }
     .btn-reject { background: var(--bg); border: 1px solid var(--line); color: var(--ink); }
@@ -280,7 +282,7 @@
     .team-progress--segmented span { border-radius: 0; flex-shrink: 0; }
     .team-progress-betrieb  { background: #94a3b8; }
     .team-progress-approved { background: #16a34a; }
-    .team-progress-pending  { background: #86efac; }
+    .team-progress-pending  { background: var(--brand); }
     .team-progress > span { display: block; height: 100%; border-radius: 999px; background: linear-gradient(90deg, var(--brand), #60a5fa); }
 
     .team-calendar-panel { margin-bottom: 1.25rem; }
@@ -297,10 +299,13 @@
     }
     .team-live-status[data-state="live"] { color: var(--success); border-color: rgba(16,185,129,.28); background: var(--success-light); }
     .team-live-status[data-state="live"] > span { background: var(--success); box-shadow: 0 0 0 4px rgba(16,185,129,.12); }
-    .team-live-status[data-state="fallback"] { color: #b45309; border-color: rgba(245,158,11,.32); background: var(--warn-light); }
+    .team-live-status[data-state="fallback"] { color: var(--brand); border-color: rgba(32,110,251,.28); background: var(--brand-light); }
     .team-live-status[data-state="fallback"] > span { background: var(--warn); }
-    .team-calendar-controls { display: flex; align-items: center; gap: .45rem; flex-shrink: 0; }
-    .team-calendar-controls strong { min-width: 8.8rem; text-align: center; font-size: .92rem; }
+    .team-calendar-controls {
+      display: grid; grid-template-columns: 36px minmax(9.25rem, 1fr) 36px;
+      align-items: center; gap: .75rem; flex-shrink: 0; min-width: 15.5rem;
+    }
+    .team-calendar-controls strong { text-align: center; font-size: .92rem; }
     .team-calendar-icon-btn {
       width: 36px; height: 36px; border: 1px solid var(--line); border-radius: 50%;
       background: var(--bg); color: var(--muted); display: inline-flex; align-items: center; justify-content: center;
@@ -312,7 +317,7 @@
       color: var(--muted); font-size: .76rem; font-weight: 700; margin-bottom: .75rem;
     }
     .legend-dot { width: .55rem; height: .55rem; border-radius: 50%; display: inline-block; }
-    .legend-dot--pending { background: var(--warn); }
+    .legend-dot--pending { background: var(--brand); }
     .legend-dot--approved { background: var(--success); }
     .legend-dot--conflict { background: var(--danger); }
     .legend-dot--system { background: #64748b; }
@@ -347,12 +352,20 @@
     }
     .team-cal-chip i { font-size: .68rem; flex-shrink: 0; }
     .team-cal-chip span { overflow: hidden; text-overflow: ellipsis; }
-    .team-cal-chip--pending { color: #b45309; background: var(--warn-light); border-color: rgba(245,158,11,.24); }
+    .team-cal-chip--pending { color: var(--brand); background: var(--brand-light); border-color: rgba(32,110,251,.24); }
     .team-cal-chip--approved { color: var(--success); background: var(--success-light); border-color: rgba(16,185,129,.22); }
     .team-cal-chip--system { color: #475569; background: #f1f5f9; border-color: rgba(100,116,139,.22); }
     .team-cal-chip--other { color: var(--brand); background: var(--brand-light); border-color: rgba(32,110,251,.18); }
     .team-cal-chip.has-conflict { color: var(--danger); background: var(--danger-light); border-color: rgba(220,38,38,.35); }
-    .team-cal-chip.has-team-overlap { box-shadow: inset 3px 0 0 var(--warn); }
+    .team-cal-chip.has-team-overlap { box-shadow: inset 3px 0 0 var(--brand); }
+    .team-cal-chip.is-highlighted {
+      outline: 2px solid var(--brand); outline-offset: 1px;
+      box-shadow: 0 0 0 4px rgba(32,110,251,.16);
+    }
+    .team-cal-day.has-highlighted-request {
+      background: linear-gradient(180deg, var(--brand-light), var(--bg));
+      box-shadow: inset 0 0 0 2px rgba(32,110,251,.38);
+    }
     .team-cal-more { font-size: .72rem; font-weight: 800; color: var(--muted); padding: .08rem .35rem; }
     @media (prefers-color-scheme: dark) {
       .team-cal-chip--system { background: #1e293b; color: #cbd5e1; border-color: #334155; }
@@ -360,8 +373,7 @@
     }
     @media (max-width: 760px) {
       .team-calendar-head { flex-direction: column; }
-      .team-calendar-controls { width: 100%; justify-content: space-between; }
-      .team-calendar-controls strong { flex: 1; min-width: 0; }
+      .team-calendar-controls { width: 100%; min-width: 0; }
     }
 
     .settings-hint {
@@ -404,7 +416,7 @@
     .modal-icon { width:46px;height:46px;border-radius:12px;display:flex;align-items:center;justify-content:center;font-size:1.1rem;margin:0 auto .9rem; }
     .modal-icon.success { background:#f0fdf4; color:#16a34a; }
     .modal-icon.danger  { background:#fef2f2; color:#dc2626; }
-    .modal-icon.warning { background:#fffbeb; color:#d97706; }
+    .modal-icon.warning { background:var(--brand-light); color:var(--brand); }
     .modal-icon.info    { background:#eff6ff; color:#3b82f6; }
     .modal-box.modal-box--wide {
       max-width: min(680px, calc(100vw - 2rem));
@@ -667,7 +679,6 @@
           </div>
           <div class="team-calendar-controls" aria-label="Kalendermonat">
             <button type="button" class="team-calendar-icon-btn" id="team-calendar-prev" title="Vorheriger Monat" aria-label="Vorheriger Monat"><i class="fa-solid fa-chevron-left"></i></button>
-            <button type="button" class="team-calendar-icon-btn" id="team-calendar-today" title="Heute" aria-label="Heute"><i class="fa-solid fa-calendar-day"></i></button>
             <strong id="team-calendar-month-label">Juni 2026</strong>
             <button type="button" class="team-calendar-icon-btn" id="team-calendar-next" title="Nächster Monat" aria-label="Nächster Monat"><i class="fa-solid fa-chevron-right"></i></button>
           </div>
@@ -786,12 +797,12 @@
 <!-- Stornieren-Modal -->
 <div class="modal-overlay" id="cancel-modal" aria-hidden="true">
   <div class="modal-box" role="dialog" aria-labelledby="cancel-modal-title">
-    <div class="modal-icon warning"><i class="fa-solid fa-ban"></i></div>
+    <div class="modal-icon danger"><i class="fa-solid fa-ban"></i></div>
     <h2 id="cancel-modal-title" style="text-align:center">Urlaub stornieren</h2>
     <p style="text-align:center">Genehmigten Urlaub wirklich stornieren? Der Kalendereintrag wird entfernt und die Urlaubstage werden wieder gutgeschrieben.</p>
     <div class="modal-actions">
       <button type="button" class="btn-secondary" id="btn-cancel-cancel">Abbrechen</button>
-      <button type="button" class="btn-primary" id="btn-cancel-confirm" style="flex:1.2;margin-top:0;background:#d97706;border-radius:10px;padding:.75rem 1rem">
+      <button type="button" class="btn-primary" id="btn-cancel-confirm" style="flex:1.2;margin-top:0;background:#dc2626;border-radius:10px;padding:.75rem 1rem">
         <i class="fa-solid fa-ban"></i> Stornieren
       </button>
     </div>
