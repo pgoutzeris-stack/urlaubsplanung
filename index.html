@@ -9,7 +9,14 @@
   <link rel="stylesheet" href="https://fonts.cdnfonts.com/css/circular-std" />
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css" crossorigin="anonymous" />
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.110.8"></script>
-  <script defer src="https://pgoutzeris-stack.github.io/ROOTS_Intranet/roots-user-bridge.js?v=20260522-hover"></script>
+  <script>
+  try {
+    if (window.self !== window.top && new URLSearchParams(window.location.search).get('authBroker') === 'v1') {
+      window.ROOTS_TOKENLESS_EMBED = true;
+    }
+  } catch (_) {}
+  </script>
+  <script defer src="https://pgoutzeris-stack.github.io/ROOTS_Intranet/roots-user-bridge.js?v=20260722-vacation"></script>
   <style>
     :root {
       --brand: #206efb; --brand-dark: #165fd9; --brand-light: #eff6ff;
@@ -843,9 +850,9 @@ window.RootsUser = window.RootsUser || {
 import { SB_URL, SB_ANON } from './config.js';
 import { initApp } from './app.js';
 
-const { createClient } = window.supabase;
-const sb = createClient(SB_URL, SB_ANON);
-window.__rootsSupabaseClient = sb;
+const vacationTokenless = window.RootsUserBridge?.TOKENLESS_EMBED === true;
+const sb = vacationTokenless ? null : window.supabase.createClient(SB_URL, SB_ANON);
+if (sb) window.__rootsSupabaseClient = sb;
 const LOGIN_HTML = '<i class="fa-solid fa-arrow-right-to-bracket"></i> Anmelden';
 
 function resetLoginBtn() {
@@ -868,11 +875,23 @@ async function onSession(session) {
   initApp(sb);
 }
 
-sb.auth.getSession().then(({ data: { session } }) => onSession(session));
-sb.auth.onAuthStateChange((event, session) => {
-  if (event === 'SIGNED_OUT') { showLogin(); return; }
-  if (session) onSession(session);
-});
+if (vacationTokenless) {
+  window.RootsUserBridge.request('user-context').then((context) => {
+    if (!context?.user?.id) throw new Error('Nicht angemeldet');
+    window.RootsUser._uid = context.user.id;
+    window.RootsUser._p = context.profile || { id: context.user.id, email: context.user.email, app_role: 'reader' };
+    window.RootsUser._mount();
+    document.getElementById('screen-login').style.display = 'none';
+    document.dispatchEvent(new CustomEvent('roots-profile-ready'));
+    initApp(null);
+  }).catch(() => showLogin());
+} else {
+  sb.auth.getSession().then(({ data: { session } }) => onSession(session));
+  sb.auth.onAuthStateChange((event, session) => {
+    if (event === 'SIGNED_OUT') { showLogin(); return; }
+    if (session) onSession(session);
+  });
+}
 // Bridge (Intranet iframe): session kommt via roots-auth-ready Event
 window.addEventListener('roots-auth-ready', (e) => {
   if (e.detail?.session) onSession(e.detail.session);
@@ -880,6 +899,7 @@ window.addEventListener('roots-auth-ready', (e) => {
 
 document.getElementById('form-login').addEventListener('submit', async (e) => {
   e.preventDefault();
+  if (!sb) return;
   const btn = document.getElementById('btn-login');
   const err = document.getElementById('login-error');
   const errT = document.getElementById('login-error-text');
