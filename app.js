@@ -24,6 +24,7 @@ let teamCalendar = { from: "", to: "", items: [] };
 let realtimeChannel = null;
 let liveRefreshHandle = null;
 let highlightedCalendarRequestId = null;
+const VACATION_TOKENLESS = window.RootsUserBridge?.TOKENLESS_EMBED === true;
 
 const els = {};
 
@@ -136,6 +137,9 @@ function findLocalConflict(start, end) {
 }
 
 async function api(method, body, query = "") {
+  if (VACATION_TOKENLESS) {
+    return window.RootsUserBridge.request("vacation", { method, query, body });
+  }
   const {
     data: { session },
   } = await sb.auth.getSession();
@@ -550,7 +554,7 @@ async function saveClosureRow(id) {
 }
 
 async function refreshData() {
-  if (!sb || !isProfileReady()) return;
+  if ((!sb && !VACATION_TOKENLESS) || !isProfileReady()) return;
   try {
     if (!isAdmin) await loadBalance();
     await loadRequests();
@@ -577,6 +581,10 @@ function queueLiveRefresh() {
 }
 
 function startAdminRealtime() {
+  if (VACATION_TOKENLESS) {
+    setTeamCalendarLiveStatus("Auto-Refresh", "fallback");
+    return;
+  }
   if (!sb || !isAdmin || realtimeChannel) return;
   try {
     realtimeChannel = sb
