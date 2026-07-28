@@ -964,13 +964,14 @@ Deno.serve(async (req) => {
         const remaining = getUrlaubstage(profile);
         const { data: mine, error: mineErr } = await service
           .from("urlaub_requests")
-          .select("start_date,end_date,status")
+          .select("start_date,end_date,status,day_part")
           .eq("user_id", user.id);
         if (mineErr) throw mineErr;
         const rows = (mine ?? []) as Array<{
           start_date: string;
           end_date: string;
           status: string;
+          day_part?: string | null;
         }>;
         const pending = await sumWorkingDaysForYear(
           kalender,
