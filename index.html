@@ -406,6 +406,14 @@
     .overlap-navigator[data-level="conflict"] .overlap-navigator-eyebrow { color: #dc2626; }
     .overlap-navigator-title { display: block; margin-top: .3rem; font-size: .9rem; line-height: 1.3; overflow-wrap: anywhere; }
     .overlap-navigator-range { display: block; margin-top: .18rem; color: #64748b; font-size: .76rem; font-weight: 650; }
+    .overlap-navigator.is-switching .overlap-navigator-copy,
+    .overlap-navigator.is-switching .overlap-navigator-counter {
+      animation: overlap-navigator-switch .24s cubic-bezier(.2,.8,.2,1);
+    }
+    @keyframes overlap-navigator-switch {
+      from { opacity: .18; transform: translateX(7px); }
+      to { opacity: 1; transform: none; }
+    }
     .overlap-nav-icon {
       width: 34px; height: 34px; display: inline-flex; align-items: center; justify-content: center; flex-shrink: 0;
       border: 1px solid #e2e8f0; border-radius: 50%; background: #fff; color: #475569; cursor: pointer;
@@ -432,6 +440,8 @@
     }
     @media (prefers-reduced-motion: reduce) {
       .team-cal-chip.is-overlap-entering { animation: none; }
+      .overlap-navigator.is-switching .overlap-navigator-copy,
+      .overlap-navigator.is-switching .overlap-navigator-counter { animation: none; }
       .overlap-navigator { transition: none; }
     }
 
@@ -916,7 +926,7 @@ window.RootsUser = window.RootsUser || {
 
 <script type="module">
 import { SB_URL, SB_ANON } from './config.js';
-import { initApp } from './app.js?v=20260728-overlap-navigator-v2';
+import { initApp } from './app.js?v=20260728-overlap-navigator-v3';
 
 const vacationTokenless = window.RootsUserBridge?.TOKENLESS_EMBED === true;
 const sb = vacationTokenless ? null : window.supabase.createClient(SB_URL, SB_ANON);

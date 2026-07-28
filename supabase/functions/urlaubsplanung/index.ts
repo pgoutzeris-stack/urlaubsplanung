@@ -289,6 +289,12 @@ function buildRequestOverlapMap(
   membersByUserId: Map<string, TeamMemberRow>,
 ): Map<string, OverlapSummary> {
   const activeIds = new Set(activeRows.map((row) => String(row.id)));
+  const activeCalendarEventIds = new Set(
+    activeRows
+      .map((row) => row.calendar_event_id)
+      .filter(Boolean)
+      .map((id) => String(id)),
+  );
   const result = new Map<string, OverlapSummary>();
 
   for (const req of pendingRows) {
@@ -328,6 +334,7 @@ function buildRequestOverlapMap(
     for (const event of eventRows) {
       if (event.urlaub_request_id === req.id) continue;
       if (event.urlaub_request_id && activeIds.has(String(event.urlaub_request_id))) continue;
+      if (activeCalendarEventIds.has(String(event.id))) continue;
       if (!rangesOverlap(req.start_date, req.end_date, event.start_date, event.end_date)) continue;
       const member = event.member_id ? membersById.get(String(event.member_id)) : null;
       const sameMember =

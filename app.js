@@ -576,6 +576,14 @@ function animateFocusedOverlap(scene) {
   });
 }
 
+function animateOverlapNavigatorChange() {
+  if (!els.overlapNavigator || window.matchMedia?.("(prefers-reduced-motion: reduce)")?.matches) return;
+  els.overlapNavigator.classList.remove("is-switching");
+  void els.overlapNavigator.offsetWidth;
+  els.overlapNavigator.classList.add("is-switching");
+  setTimeout(() => els.overlapNavigator?.classList.remove("is-switching"), 260);
+}
+
 async function focusOverlapScene(index) {
   const state = overlapNavigatorState;
   if (!state?.scenes?.length) return;
@@ -588,11 +596,23 @@ async function focusOverlapScene(index) {
     button.classList.toggle("is-active", button.dataset.showCalendar === scene.requestId);
   });
   const focusDate = scene.overlapStart || scene.requestStart;
-  teamCalendarMonth = new Date(Number(focusDate.slice(0, 4)), Number(focusDate.slice(5, 7)) - 1, 1);
+  const nextMonth = new Date(Number(focusDate.slice(0, 4)), Number(focusDate.slice(5, 7)) - 1, 1);
+  const nextRange = getTeamCalendarRange(nextMonth);
+  const calendarReady = teamCalendar.from === nextRange.from && teamCalendar.to === nextRange.to;
+  teamCalendarMonth = nextMonth;
   renderOverlapNavigator();
-  const loaded = await loadTeamCalendar();
+  let loaded = true;
+  if (calendarReady) {
+    ++teamCalendarLoadGeneration;
+    renderTeamCalendar();
+  } else {
+    loaded = await loadTeamCalendar();
+  }
   if (!loaded || focusGeneration !== overlapFocusGeneration || overlapNavigatorState !== state) return;
-  requestAnimationFrame(() => requestAnimationFrame(() => animateFocusedOverlap(scene)));
+  requestAnimationFrame(() => requestAnimationFrame(() => {
+    animateOverlapNavigatorChange();
+    animateFocusedOverlap(scene);
+  }));
 }
 
 function closeOverlapNavigator({ clearHighlight = true } = {}) {
@@ -604,7 +624,7 @@ function closeOverlapNavigator({ clearHighlight = true } = {}) {
   document.querySelectorAll("[data-show-calendar]").forEach((button) => button.classList.remove("is-active"));
   overlapNavigatorState = null;
   if (els.overlapNavigator) {
-    els.overlapNavigator.classList.remove("is-open");
+    els.overlapNavigator.classList.remove("is-open", "is-switching");
     setTimeout(() => {
       if (!overlapNavigatorState) els.overlapNavigator.hidden = true;
     }, 180);
