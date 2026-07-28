@@ -184,6 +184,7 @@
       border: 1px solid var(--line); border-radius: 12px; padding: 1rem 1.1rem; background: var(--status-bg);
     }
     .req-card-top { display: flex; justify-content: space-between; align-items: flex-start; gap: .75rem; margin-bottom: .5rem; }
+    .req-card-pills { display: flex; align-items: flex-end; flex-direction: column; gap: .38rem; flex-shrink: 0; }
     .req-name { font-size: 1rem; font-weight: 700; }
     .req-range { font-size: .88rem; color: var(--muted); margin-top: .15rem; display: flex; align-items: center; gap: .45rem; flex-wrap: wrap; }
     .half-day-badge { display: inline-flex; align-items: center; gap: .3rem; font-size: .75rem; font-weight: 600; color: var(--brand); background: var(--brand-light); border-radius: 999px; padding: .1rem .55rem; }
@@ -192,16 +193,15 @@
     .req-reject-reason { color: var(--danger); }
     .req-card--conflict { border-color: rgba(220,38,38,.42); box-shadow: inset 3px 0 0 var(--danger); }
     .req-card--team_overlap { border-color: rgba(32,110,251,.34); box-shadow: inset 3px 0 0 var(--brand); }
-    .req-overlap {
-      margin-top: .75rem; border-radius: 10px; padding: .7rem .8rem;
-      border: 1px solid var(--line); background: var(--bg); font-size: .82rem;
+    .req-overlap-pill {
+      display: inline-flex; align-items: center; gap: .38rem; min-height: 26px; padding: .24rem .62rem;
+      border: 1px solid transparent; border-radius: 999px; font-size: .72rem; font-weight: 750;
+      line-height: 1; white-space: nowrap;
     }
-    .req-overlap--clear { border-color: rgba(16,185,129,.22); background: var(--success-light); color: var(--success); }
-    .req-overlap--team_overlap { border-color: rgba(32,110,251,.28); background: var(--brand-light); color: var(--brand); }
-    .req-overlap--conflict { border-color: rgba(220,38,38,.34); background: var(--danger-light); color: var(--danger); }
-    .req-overlap-head { display: flex; align-items: center; gap: .45rem; line-height: 1.35; }
-    .req-overlap-details { display: flex; flex-direction: column; gap: .18rem; margin-top: .45rem; color: var(--muted); }
-    .req-overlap-details small { font-weight: 700; color: inherit; }
+    .req-overlap-pill i { font-size: .68rem; }
+    .req-overlap-pill--clear { border-color: rgba(16,185,129,.22); background: var(--success-light); color: var(--success); }
+    .req-overlap-pill--team_overlap { border-color: rgba(32,110,251,.28); background: var(--brand-light); color: var(--brand); }
+    .req-overlap-pill--conflict { border-color: rgba(220,38,38,.3); background: var(--danger-light); color: var(--danger); }
     .status-pill {
       display: inline-flex; align-items: center; gap: 5px; font-size: .75rem; font-weight: 700;
       padding: .3rem .65rem; border-radius: 999px; white-space: nowrap;
@@ -218,6 +218,24 @@
     }
     .btn-show-calendar { background: var(--brand-light); border: 1px solid rgba(32,110,251,.24); color: var(--brand); }
     .btn-show-calendar:hover { border-color: var(--brand); background: var(--bg); }
+    .btn-show-calendar.has-overlap { position: relative; isolation: isolate; }
+    .btn-show-calendar.has-overlap::after {
+      content: ""; position: absolute; inset: -3px; z-index: -1; border: 1px solid rgba(32,110,251,.42);
+      border-radius: inherit; opacity: 0; animation: overlap-button-pulse 2.8s ease-out infinite;
+    }
+    .btn-show-calendar.has-overlap.is-conflict::after { border-color: rgba(220,38,38,.48); }
+    .btn-show-calendar.is-active { background: var(--brand); border-color: var(--brand); color: #fff; }
+    .btn-overlap-count {
+      display: inline-flex; align-items: center; justify-content: center; min-width: 22px; height: 22px;
+      padding: 0 .34rem; border-radius: 999px; background: #fff; color: var(--brand); font-size: .7rem; font-weight: 850;
+      box-shadow: 0 1px 4px rgba(15,23,42,.12);
+    }
+    .btn-show-calendar.is-conflict .btn-overlap-count { color: var(--danger); }
+    @keyframes overlap-button-pulse {
+      0%, 58% { opacity: 0; transform: scale(1); }
+      68% { opacity: .8; }
+      100% { opacity: 0; transform: scale(1.055); }
+    }
     .btn-approve { background: var(--success); color: #fff; }
     .btn-approve:hover { filter: brightness(1.05); }
     .btn-reject { background: var(--bg); border: 1px solid var(--line); color: var(--ink); }
@@ -294,7 +312,7 @@
     .team-progress-pending  { background: var(--brand); }
     .team-progress > span { display: block; height: 100%; border-radius: 999px; background: linear-gradient(90deg, var(--brand), #60a5fa); }
 
-    .team-calendar-panel { margin-bottom: 1.25rem; }
+    .team-calendar-panel { margin-bottom: 1.25rem; position: relative; }
     .team-calendar-head {
       display: flex; align-items: flex-start; justify-content: space-between; gap: 1rem; margin-bottom: .85rem;
     }
@@ -329,6 +347,7 @@
     .legend-dot--pending { background: var(--brand); }
     .legend-dot--approved { background: var(--success); }
     .legend-dot--conflict { background: var(--danger); }
+    .legend-dot--overlap { background: #f59e0b; }
     .legend-dot--system { background: #64748b; }
     .team-calendar-shell { overflow-x: auto; border: 1px solid var(--line); border-radius: 12px; background: var(--bg); }
     .team-calendar-weekdays, .team-calendar-grid {
@@ -371,10 +390,58 @@
       outline: 2px solid var(--brand); outline-offset: 1px;
       box-shadow: 0 0 0 4px rgba(32,110,251,.16);
     }
+    .team-cal-chip.is-overlap-target {
+      outline-color: #f59e0b;
+      box-shadow: 0 0 0 4px rgba(245,158,11,.17);
+    }
     .team-cal-day.has-highlighted-request {
       background: linear-gradient(180deg, var(--brand-light), var(--bg));
       box-shadow: inset 0 0 0 2px rgba(32,110,251,.38);
     }
+    .team-cal-day.has-highlighted-target { box-shadow: inset 0 0 0 2px rgba(245,158,11,.5); }
+    .team-cal-day.has-highlighted-request.has-highlighted-target {
+      box-shadow: inset 0 0 0 2px rgba(32,110,251,.5), inset 0 0 0 5px rgba(245,158,11,.28);
+    }
+    .team-cal-chip.is-overlap-entering { animation: overlap-chip-focus 1s cubic-bezier(.2,.8,.2,1); }
+    .team-cal-day.is-overlap-entering { animation: overlap-day-focus 1s cubic-bezier(.2,.8,.2,1); }
+    @keyframes overlap-chip-focus {
+      0% { transform: translateY(4px) scale(.94); opacity: .45; }
+      55% { transform: translateY(-1px) scale(1.04); opacity: 1; }
+      100% { transform: none; opacity: 1; }
+    }
+    @keyframes overlap-day-focus {
+      0% { background-color: rgba(245,158,11,.2); }
+      100% { background-color: var(--bg); }
+    }
+    .overlap-navigator {
+      position: absolute; top: 74px; right: 1.25rem; z-index: 8; width: min(360px, calc(100% - 2.5rem));
+      padding: .85rem; border: 1px solid #e2e8f0; border-radius: 8px; background: #fff; color: #0f172a;
+      box-shadow: 0 18px 45px rgba(15,23,42,.18); opacity: 0; transform: translateY(-8px) scale(.98);
+      transform-origin: top right; transition: opacity .18s ease, transform .18s ease;
+    }
+    .overlap-navigator[hidden] { display: none; }
+    .overlap-navigator.is-open { opacity: 1; transform: none; }
+    .overlap-navigator-top { display: flex; align-items: flex-start; justify-content: space-between; gap: .75rem; }
+    .overlap-navigator-copy { min-width: 0; }
+    .overlap-navigator-eyebrow {
+      display: inline-flex; align-items: center; gap: .35rem; color: #206efb; font-size: .68rem; font-weight: 800;
+      text-transform: uppercase; letter-spacing: 0;
+    }
+    .overlap-navigator[data-level="conflict"] .overlap-navigator-eyebrow { color: #dc2626; }
+    .overlap-navigator-title { display: block; margin-top: .3rem; font-size: .9rem; line-height: 1.3; overflow-wrap: anywhere; }
+    .overlap-navigator-range { display: block; margin-top: .18rem; color: #64748b; font-size: .76rem; font-weight: 650; }
+    .overlap-nav-icon {
+      width: 34px; height: 34px; display: inline-flex; align-items: center; justify-content: center; flex-shrink: 0;
+      border: 1px solid #e2e8f0; border-radius: 50%; background: #fff; color: #475569; cursor: pointer;
+    }
+    .overlap-nav-icon:hover:not(:disabled) { border-color: #206efb; color: #206efb; background: #eff6ff; }
+    .overlap-nav-icon:disabled { opacity: .35; cursor: default; }
+    .overlap-navigator-footer {
+      display: flex; align-items: center; justify-content: space-between; gap: .75rem; margin-top: .78rem;
+      padding-top: .68rem; border-top: 1px solid #f1f5f9;
+    }
+    .overlap-navigator-counter { color: #64748b; font-size: .72rem; font-weight: 800; font-variant-numeric: tabular-nums; }
+    .overlap-navigator-controls { display: flex; align-items: center; gap: .38rem; }
     .team-cal-more { font-size: .72rem; font-weight: 800; color: var(--muted); padding: .08rem .35rem; }
     @media (prefers-color-scheme: dark) {
       .team-cal-chip--system { background: #1e293b; color: #cbd5e1; border-color: #334155; }
@@ -383,6 +450,15 @@
     @media (max-width: 760px) {
       .team-calendar-head { flex-direction: column; }
       .team-calendar-controls { width: 100%; min-width: 0; }
+      .req-card-top { flex-direction: column; }
+      .req-card-pills { align-items: flex-start; flex-direction: row; flex-wrap: wrap; }
+      .overlap-navigator { position: sticky; top: .75rem; right: auto; width: 100%; margin-bottom: .85rem; }
+    }
+    @media (prefers-reduced-motion: reduce) {
+      .btn-show-calendar.has-overlap::after,
+      .team-cal-chip.is-overlap-entering,
+      .team-cal-day.is-overlap-entering { animation: none; }
+      .overlap-navigator { transition: none; }
     }
 
     .settings-hint {
@@ -692,10 +768,28 @@
             <button type="button" class="team-calendar-icon-btn" id="team-calendar-next" title="Nächster Monat" aria-label="Nächster Monat"><i class="fa-solid fa-chevron-right"></i></button>
           </div>
         </div>
+        <div class="overlap-navigator" id="overlap-navigator" data-level="team_overlap" role="status" aria-live="polite" hidden>
+          <div class="overlap-navigator-top">
+            <div class="overlap-navigator-copy">
+              <span class="overlap-navigator-eyebrow" id="overlap-navigator-eyebrow"><i class="fa-solid fa-users-viewfinder"></i> Team-Überschneidung</span>
+              <strong class="overlap-navigator-title" id="overlap-navigator-title"></strong>
+              <span class="overlap-navigator-range" id="overlap-navigator-range"></span>
+            </div>
+            <button type="button" class="overlap-nav-icon" data-overlap-nav="close" title="Überlappungsansicht schließen" aria-label="Überlappungsansicht schließen"><i class="fa-solid fa-xmark"></i></button>
+          </div>
+          <div class="overlap-navigator-footer">
+            <span class="overlap-navigator-counter" id="overlap-navigator-counter">1 / 1</span>
+            <div class="overlap-navigator-controls">
+              <button type="button" class="overlap-nav-icon" id="overlap-navigator-prev" data-overlap-nav="prev" title="Vorherige Überlappung" aria-label="Vorherige Überlappung"><i class="fa-solid fa-chevron-left"></i></button>
+              <button type="button" class="overlap-nav-icon" id="overlap-navigator-next" data-overlap-nav="next" title="Nächste Überlappung" aria-label="Nächste Überlappung"><i class="fa-solid fa-chevron-right"></i></button>
+            </div>
+          </div>
+        </div>
         <div class="team-calendar-legend" aria-hidden="true">
           <span class="legend-dot legend-dot--pending"></span> Offen
           <span class="legend-dot legend-dot--approved"></span> Genehmigt
           <span class="legend-dot legend-dot--conflict"></span> Konflikt
+          <span class="legend-dot legend-dot--overlap"></span> Überschneidung
           <span class="legend-dot legend-dot--system"></span> Firmenfrei
         </div>
         <div class="team-calendar-shell">
@@ -848,7 +942,7 @@ window.RootsUser = window.RootsUser || {
 
 <script type="module">
 import { SB_URL, SB_ANON } from './config.js';
-import { initApp } from './app.js';
+import { initApp } from './app.js?v=20260728-overlap-navigator-v1';
 
 const vacationTokenless = window.RootsUserBridge?.TOKENLESS_EMBED === true;
 const sb = vacationTokenless ? null : window.supabase.createClient(SB_URL, SB_ANON);

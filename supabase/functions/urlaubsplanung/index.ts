@@ -156,6 +156,7 @@ type TeamCalendarEventRow = {
 type OverlapItem = {
   id: string;
   source: "request" | "calendar";
+  kind?: "conflict" | "team_overlap";
   status?: string | null;
   type?: string | null;
   label: string;
@@ -304,11 +305,12 @@ function buildRequestOverlapMap(
       bucket: OverlapItem[],
       seen: Set<string>,
       item: OverlapItem,
+      kind: "conflict" | "team_overlap",
     ) => {
       const key = `${item.source}:${item.id}`;
       if (seen.has(key)) return;
       seen.add(key);
-      bucket.push(item);
+      bucket.push({ ...item, kind });
     };
 
     for (const other of activeRows) {
@@ -317,9 +319,9 @@ function buildRequestOverlapMap(
       if (!rangesOverlap(req.start_date, req.end_date, other.start_date, other.end_date)) continue;
       const item = requestOverlapItem(other);
       if (other.user_id === req.user_id) {
-        pushUnique(conflicts, seenConflicts, item);
+        pushUnique(conflicts, seenConflicts, item, "conflict");
       } else {
-        pushUnique(teamOverlaps, seenTeam, item);
+        pushUnique(teamOverlaps, seenTeam, item, "team_overlap");
       }
     }
 
@@ -333,9 +335,9 @@ function buildRequestOverlapMap(
         (member?.user_id && member.user_id === req.user_id);
       const item = calendarOverlapItem(event, member);
       if (sameMember) {
-        pushUnique(conflicts, seenConflicts, item);
+        pushUnique(conflicts, seenConflicts, item, "conflict");
       } else {
-        pushUnique(teamOverlaps, seenTeam, item);
+        pushUnique(teamOverlaps, seenTeam, item, "team_overlap");
       }
     }
 
@@ -350,7 +352,7 @@ function buildRequestOverlapMap(
       conflict_count: conflicts.length,
       team_overlap_count: teamOverlaps.length,
       summary: formatOverlapSummary(level, conflicts, teamOverlaps),
-      items: [...conflicts, ...teamOverlaps].slice(0, 6),
+      items: [...conflicts, ...teamOverlaps],
     });
   }
 

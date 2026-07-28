@@ -24,6 +24,10 @@ let teamCalendar = { from: "", to: "", items: [] };
 let realtimeChannel = null;
 let liveRefreshHandle = null;
 let highlightedCalendarRequestId = null;
+let highlightedCalendarTarget = null;
+let overlapNavigatorState = null;
+let teamCalendarLoadGeneration = 0;
+let overlapFocusGeneration = 0;
 const VACATION_TOKENLESS = window.RootsUserBridge?.TOKENLESS_EMBED === true;
 
 const els = {};
@@ -249,6 +253,20 @@ async function loadBalance() {
 async function loadRequests() {
   const scope = isAdmin ? "admin" : "mine";
   requests = (await api("GET", null, `?scope=${scope}`)) || [];
+  if (overlapNavigatorState) {
+    const currentKey = overlapNavigatorState.scenes?.[overlapNavigatorState.index]?.key;
+    const scenes = buildOverlapScenes(highlightedCalendarRequestId);
+    const nextIndex = Math.max(0, scenes.findIndex((scene) => scene.key === currentKey));
+    overlapNavigatorState = scenes.length ? { scenes, index: nextIndex } : null;
+    if (overlapNavigatorState) {
+      const scene = overlapNavigatorState.scenes[overlapNavigatorState.index];
+      highlightedCalendarRequestId = scene.requestId;
+      highlightedCalendarTarget = scene.target;
+    } else {
+      highlightedCalendarRequestId = null;
+      highlightedCalendarTarget = null;
+    }
+  }
   renderLists();
   updateStats();
   if (isAdmin) {
@@ -266,14 +284,17 @@ async function loadTeamOverview(year) {
 
 async function loadTeamCalendar() {
   if (!isAdmin || !els.adminTeamCalendar) return;
+  const generation = ++teamCalendarLoadGeneration;
   const { from, to } = getTeamCalendarRange(teamCalendarMonth);
   const data = await api("GET", null, `?scope=team_calendar&from=${from}&to=${to}`);
+  if (generation !== teamCalendarLoadGeneration) return false;
   teamCalendar = {
     from: data?.from || from,
     to: data?.to || to,
     items: data?.items || [],
   };
   renderTeamCalendar();
+  return true;
 }
 
 function closureKindLabel(kind) {
@@ -343,6 +364,17 @@ function calendarPriority(item) {
   return 4;
 }
 
+function calendarItemMatchesOverlap(item, overlapItem) {
+  if (!item || !overlapItem) return false;
+  if (overlapItem.source === "request") {
+    return (
+      (item.source === "request" && String(item.request_id) === String(overlapItem.id)) ||
+      String(item.urlaub_request_id || "") === String(overlapItem.id)
+    );
+  }
+  return item.source !== "request" && String(item.id) === String(overlapItem.id);
+}
+
 function calendarChipClass(item) {
   const classes = ["team-cal-chip"];
   if (item.source === "request") classes.push("team-cal-chip--pending");
@@ -352,7 +384,10 @@ function calendarChipClass(item) {
   if (item.overlap?.level === "conflict") classes.push("has-conflict");
   if (item.overlap?.level === "team_overlap") classes.push("has-team-overlap");
   if (item.source === "request" && item.request_id === highlightedCalendarRequestId) {
-    classes.push("is-highlighted");
+    classes.push("is-highlighted", "is-overlap-primary");
+  }
+  if (calendarItemMatchesOverlap(item, highlightedCalendarTarget)) {
+    classes.push("is-highlighted", "is-overlap-target");
   }
   return classes.join(" ");
 }
@@ -376,7 +411,11 @@ function renderCalendarChip(item) {
   const label = item.kuerzel || (item.member_name || "?").slice(0, 2).toUpperCase();
   const requestAttr =
     item.source === "request" ? ` data-calendar-request-id="${escapeHtml(item.request_id)}"` : "";
-  return `<div class="${calendarChipClass(item)}"${requestAttr} title="${escapeHtml(calendarChipTitle(item))}">
+  const itemAttr = ` data-calendar-item-id="${escapeHtml(item.id)}"`;
+  const linkedRequestAttr = item.urlaub_request_id
+    ? ` data-calendar-linked-request-id="${escapeHtml(item.urlaub_request_id)}"`
+    : "";
+  return `<div class="${calendarChipClass(item)}"${requestAttr}${itemAttr}${linkedRequestAttr} title="${escapeHtml(calendarChipTitle(item))}">
     <i class="fa-solid ${calendarChipIcon(item)}"></i>
     <span>${escapeHtml(label)}</span>
   </div>`;
@@ -422,7 +461,10 @@ function renderTeamCalendar() {
     if (dayItems.some((item) => item.source === "request" && item.request_id === highlightedCalendarRequestId)) {
       cellClasses.push("has-highlighted-request");
     }
-    cells.push(`<div class="${cellClasses.join(" ")}">
+    if (dayItems.some((item) => calendarItemMatchesOverlap(item, highlightedCalendarTarget))) {
+      cellClasses.push("has-highlighted-target");
+    }
+    cells.push(`<div class="${cellClasses.join(" ")}" data-calendar-day="${day}">
       <div class="team-cal-date">${Number(day.slice(8, 10))}</div>
       <div class="team-cal-items">
         ${visible.map(renderCalendarChip).join("")}
@@ -433,13 +475,15 @@ function renderTeamCalendar() {
   els.adminTeamCalendar.innerHTML = cells.join("");
 
   const pendingItems = (teamCalendar.items || []).filter((item) => item.source === "request");
-  const conflictCount = pendingItems.filter((item) => item.overlap?.level === "conflict").length;
+  const overlapScenes = buildOverlapScenes();
   if (els.teamCalendarSummary) {
-    els.teamCalendarSummary.textContent = `${pendingItems.length} offene Anfragen · ${conflictCount} Konflikte`;
+    els.teamCalendarSummary.textContent = `${pendingItems.length} offene Anfragen · ${overlapScenes.length} Überschneidungen`;
   }
+  renderOverlapNavigator();
 }
 
 async function shiftTeamCalendarMonth(delta) {
+  closeOverlapNavigator();
   teamCalendarMonth = new Date(
     teamCalendarMonth.getFullYear(),
     teamCalendarMonth.getMonth() + delta,
@@ -448,10 +492,151 @@ async function shiftTeamCalendarMonth(delta) {
   await loadTeamCalendar();
 }
 
+function overlapCount(overlap) {
+  return Number(overlap?.conflict_count || 0) + Number(overlap?.team_overlap_count || 0);
+}
+
+function overlapSceneKey(request, item) {
+  const primary = `request:${request.id}`;
+  const target = `${item.source}:${item.id}`;
+  return item.source === "request" ? [primary, target].sort().join("|") : `${primary}|${target}`;
+}
+
+function cssEscape(value) {
+  if (window.CSS?.escape) return window.CSS.escape(String(value));
+  return String(value).replace(/["\\]/g, "\\$&");
+}
+
+function buildOverlapScenes(preferredRequestId) {
+  const pending = requests.filter((row) => row.status === "pending" && overlapCount(row.overlap) > 0);
+  const preferred = pending.find((row) => row.id === preferredRequestId);
+  const ordered = preferred ? [preferred, ...pending.filter((row) => row.id !== preferredRequestId)] : pending;
+  const seen = new Set();
+  const scenes = [];
+  for (const request of ordered) {
+    for (const item of request.overlap?.items || []) {
+      const key = overlapSceneKey(request, item);
+      if (seen.has(key)) continue;
+      seen.add(key);
+      const overlapStart = request.start_date > item.start_date ? request.start_date : item.start_date;
+      const overlapEnd = request.end_date < item.end_date ? request.end_date : item.end_date;
+      scenes.push({
+        key,
+        requestId: request.id,
+        applicantName: request.applicant_name,
+        requestStart: request.start_date,
+        requestEnd: request.end_date,
+        level: item.kind || request.overlap?.level || "team_overlap",
+        target: item,
+        overlapStart,
+        overlapEnd,
+      });
+    }
+  }
+  return scenes;
+}
+
+function overlapTargetSelector(target) {
+  if (!target) return "";
+  if (target.source === "request") {
+    return `[data-calendar-request-id="${cssEscape(target.id)}"],[data-calendar-linked-request-id="${cssEscape(target.id)}"]`;
+  }
+  return `[data-calendar-item-id="${cssEscape(target.id)}"]`;
+}
+
+function renderOverlapNavigator() {
+  const state = overlapNavigatorState;
+  if (!els.overlapNavigator) return;
+  if (!state?.scenes?.length) {
+    els.overlapNavigator.hidden = true;
+    els.overlapNavigator.classList.remove("is-open");
+    return;
+  }
+  const scene = state.scenes[state.index];
+  if (!scene) return;
+  const total = state.scenes.length;
+  const targetName = scene.target.member_name || scene.target.label || "Kalendereintrag";
+  const levelLabel = scene.level === "conflict" ? "Terminkonflikt" : "Team-Überschneidung";
+  els.overlapNavigator.dataset.level = scene.level;
+  els.overlapNavigatorEyebrow.innerHTML = `<i class="fa-solid ${scene.level === "conflict" ? "fa-triangle-exclamation" : "fa-users-viewfinder"}"></i> ${levelLabel}`;
+  els.overlapNavigatorTitle.textContent = `${scene.applicantName} & ${targetName}`;
+  els.overlapNavigatorRange.textContent = `${formatDeYmd(scene.overlapStart)} – ${formatDeYmd(scene.overlapEnd)}`;
+  els.overlapNavigatorCounter.textContent = `${state.index + 1} / ${total}`;
+  els.overlapNavigatorPrev.disabled = total < 2;
+  els.overlapNavigatorNext.disabled = total < 2;
+  els.overlapNavigator.hidden = false;
+  requestAnimationFrame(() => els.overlapNavigator.classList.add("is-open"));
+}
+
+function animateFocusedOverlap(scene) {
+  const primary = els.adminTeamCalendar?.querySelector(
+    `[data-calendar-request-id="${cssEscape(scene.requestId)}"]`,
+  );
+  const target = els.adminTeamCalendar?.querySelector(overlapTargetSelector(scene.target));
+  const day = els.adminTeamCalendar?.querySelector(
+    `[data-calendar-day="${cssEscape(scene.overlapStart)}"]`,
+  );
+  const focusElement = day || primary || target;
+  focusElement?.scrollIntoView({ behavior: "smooth", block: "center", inline: "center" });
+  [primary, target, day].filter(Boolean).forEach((element) => {
+    element.classList.remove("is-overlap-entering");
+    void element.offsetWidth;
+    element.classList.add("is-overlap-entering");
+    setTimeout(() => element.classList.remove("is-overlap-entering"), 1100);
+  });
+}
+
+async function focusOverlapScene(index, { scrollPanel = false } = {}) {
+  const state = overlapNavigatorState;
+  if (!state?.scenes?.length) return;
+  const focusGeneration = ++overlapFocusGeneration;
+  state.index = (index + state.scenes.length) % state.scenes.length;
+  const scene = state.scenes[state.index];
+  highlightedCalendarRequestId = scene.requestId;
+  highlightedCalendarTarget = scene.target;
+  document.querySelectorAll("[data-show-calendar]").forEach((button) => {
+    button.classList.toggle("is-active", button.dataset.showCalendar === scene.requestId);
+  });
+  const focusDate = scene.overlapStart || scene.requestStart;
+  teamCalendarMonth = new Date(Number(focusDate.slice(0, 4)), Number(focusDate.slice(5, 7)) - 1, 1);
+  renderOverlapNavigator();
+  const loaded = await loadTeamCalendar();
+  if (!loaded || focusGeneration !== overlapFocusGeneration || overlapNavigatorState !== state) return;
+  if (scrollPanel) {
+    els.teamCalendarPanel?.scrollIntoView({ behavior: "smooth", block: "start" });
+  }
+  requestAnimationFrame(() => requestAnimationFrame(() => animateFocusedOverlap(scene)));
+}
+
+function closeOverlapNavigator({ clearHighlight = true } = {}) {
+  ++overlapFocusGeneration;
+  if (clearHighlight) {
+    highlightedCalendarRequestId = null;
+    highlightedCalendarTarget = null;
+  }
+  document.querySelectorAll("[data-show-calendar]").forEach((button) => button.classList.remove("is-active"));
+  overlapNavigatorState = null;
+  if (els.overlapNavigator) {
+    els.overlapNavigator.classList.remove("is-open");
+    setTimeout(() => {
+      if (!overlapNavigatorState) els.overlapNavigator.hidden = true;
+    }, 180);
+  }
+  if (els.adminTeamCalendar) renderTeamCalendar();
+}
+
 async function showRequestInTeamCalendar(id) {
   const request = requests.find((row) => row.id === id);
   if (!request) return;
+  const scenes = buildOverlapScenes(id);
+  if (scenes.length) {
+    overlapNavigatorState = { scenes, index: 0 };
+    await focusOverlapScene(0, { scrollPanel: true });
+    return;
+  }
+  closeOverlapNavigator({ clearHighlight: false });
   highlightedCalendarRequestId = id;
+  highlightedCalendarTarget = null;
   const year = Number(String(request.start_date).slice(0, 4));
   const month = Number(String(request.start_date).slice(5, 7)) - 1;
   if (Number.isFinite(year) && Number.isFinite(month)) {
@@ -462,6 +647,8 @@ async function showRequestInTeamCalendar(id) {
   requestAnimationFrame(() => {
     const chip = els.adminTeamCalendar?.querySelector(`[data-calendar-request-id="${id}"]`);
     chip?.scrollIntoView({ behavior: "smooth", block: "center", inline: "center" });
+    chip?.classList.add("is-overlap-entering");
+    setTimeout(() => chip?.classList.remove("is-overlap-entering"), 1100);
   });
 }
 
@@ -670,27 +857,20 @@ function renderOverlapSummary(overlap) {
       : level === "team_overlap"
         ? "fa-users-viewfinder"
         : "fa-circle-check";
-  const detail = (overlap.items || [])
-    .slice(0, 2)
-    .map((item) => {
-      const range = `${formatDeYmd(item.start_date)} – ${formatDeYmd(item.end_date)}`;
-      return `<span>${escapeHtml(item.label)} (${range})</span>`;
-    })
-    .join("");
-  const count =
-    level === "conflict"
-      ? overlap.conflict_count || 0
-      : level === "team_overlap"
-        ? overlap.team_overlap_count || 0
-        : 0;
-  const more = count > 2 ? `<small>+${count - 2} weitere</small>` : "";
-  return `<div class="req-overlap req-overlap--${escapeHtml(level)}">
-    <div class="req-overlap-head">
-      <i class="fa-solid ${icon}"></i>
-      <strong>${escapeHtml(overlap.summary || "Keine Überschneidung")}</strong>
-    </div>
-    ${detail || more ? `<div class="req-overlap-details">${detail}${more}</div>` : ""}
-  </div>`;
+  const count = overlapCount(overlap);
+  const label =
+    level === "clear"
+      ? "Keine Überschneidung"
+      : count === 1
+        ? "1 Überschneidung"
+        : `${count} Überschneidungen`;
+  const tooltip = (overlap.items || [])
+    .map((item) => `${item.label}: ${formatDeYmd(item.start_date)} – ${formatDeYmd(item.end_date)}`)
+    .join(" · ");
+  return `<span class="req-overlap-pill req-overlap-pill--${escapeHtml(level)}" title="${escapeHtml(tooltip || label)}">
+    <i class="fa-solid ${icon}"></i>
+    <span>${escapeHtml(label)}</span>
+  </span>`;
 }
 
 function renderRequestCard(r, { showActions = false, showUserActions = false } = {}) {
@@ -704,7 +884,11 @@ function renderRequestCard(r, { showActions = false, showUserActions = false } =
   const actions =
     showActions && r.status === "pending"
       ? `<div class="req-actions">
-          <button type="button" class="btn-show-calendar" data-show-calendar="${r.id}"><i class="fa-solid fa-calendar-days"></i> Teamkalender anzeigen</button>
+          <button type="button" class="btn-show-calendar${overlapCount(r.overlap) ? ` has-overlap is-${escapeHtml(r.overlap?.level || "team_overlap")}` : ""}${overlapNavigatorState && highlightedCalendarRequestId === r.id ? " is-active" : ""}" data-show-calendar="${r.id}">
+            <i class="fa-solid fa-calendar-days"></i>
+            <span>Teamkalender anzeigen</span>
+            ${overlapCount(r.overlap) ? `<span class="btn-overlap-count" aria-label="${overlapCount(r.overlap)} Überschneidungen">${overlapCount(r.overlap)}</span>` : ""}
+          </button>
           <button type="button" class="btn-approve" data-approve="${r.id}"><i class="fa-solid fa-check"></i> Genehmigen</button>
           <button type="button" class="btn-reject" data-reject="${r.id}"><i class="fa-solid fa-xmark"></i> Ablehnen</button>
         </div>`
@@ -739,12 +923,14 @@ function renderRequestCard(r, { showActions = false, showUserActions = false } =
         <h3 class="req-name">${escapeHtml(r.applicant_name)}</h3>
         <p class="req-range">${formatDeYmd(r.start_date)} – ${formatDeYmd(r.end_date)} · ${days} ${dayLabel}${halfBadge}</p>
       </div>
-      <span class="status-pill ${st.cls}"><i class="fa-solid ${st.icon}"></i> ${st.label}</span>
+      <div class="req-card-pills">
+        <span class="status-pill ${st.cls}"><i class="fa-solid ${st.icon}"></i> ${st.label}</span>
+        ${overlapNote}
+      </div>
     </div>
     ${r.note ? `<p class="req-note">${escapeHtml(r.note)}</p>` : ""}
     ${rejectNote}
     ${calNote}
-    ${overlapNote}
     ${actions}
     ${userActions}
   </article>`;
@@ -1073,6 +1259,22 @@ function bindUi() {
   if (els.teamCalendarNext) {
     els.teamCalendarNext.addEventListener("click", () => void shiftTeamCalendarMonth(1));
   }
+  if (els.overlapNavigator) {
+    els.overlapNavigator.addEventListener("click", (event) => {
+      const action = event.target.closest("[data-overlap-nav]")?.dataset.overlapNav;
+      if (!action) return;
+      if (action === "close") {
+        closeOverlapNavigator();
+        return;
+      }
+      if (action === "prev") {
+        void focusOverlapScene((overlapNavigatorState?.index || 0) - 1);
+      }
+      if (action === "next") {
+        void focusOverlapScene((overlapNavigatorState?.index || 0) + 1);
+      }
+    });
+  }
 
   document.addEventListener("roots-profile-ready", () => void bootApp());
 
@@ -1115,6 +1317,13 @@ function cacheEls() {
   els.teamCalendarLiveStatus = document.getElementById("team-calendar-live-status");
   els.teamCalendarPrev = document.getElementById("team-calendar-prev");
   els.teamCalendarNext = document.getElementById("team-calendar-next");
+  els.overlapNavigator = document.getElementById("overlap-navigator");
+  els.overlapNavigatorEyebrow = document.getElementById("overlap-navigator-eyebrow");
+  els.overlapNavigatorTitle = document.getElementById("overlap-navigator-title");
+  els.overlapNavigatorRange = document.getElementById("overlap-navigator-range");
+  els.overlapNavigatorCounter = document.getElementById("overlap-navigator-counter");
+  els.overlapNavigatorPrev = document.getElementById("overlap-navigator-prev");
+  els.overlapNavigatorNext = document.getElementById("overlap-navigator-next");
   els.btnAdminSettings = document.getElementById("btn-admin-settings");
   els.adminSettingsModal = document.getElementById("admin-settings-modal");
   els.btnAdminSettingsClose = document.getElementById("btn-admin-settings-close");
