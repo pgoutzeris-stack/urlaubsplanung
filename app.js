@@ -458,12 +458,6 @@ function renderTeamCalendar() {
     const cellClasses = ["team-cal-day"];
     if (day.slice(0, 7) !== currentMonth) cellClasses.push("is-outside");
     if (day === today) cellClasses.push("is-today");
-    if (dayItems.some((item) => item.source === "request" && item.request_id === highlightedCalendarRequestId)) {
-      cellClasses.push("has-highlighted-request");
-    }
-    if (dayItems.some((item) => calendarItemMatchesOverlap(item, highlightedCalendarTarget))) {
-      cellClasses.push("has-highlighted-target");
-    }
     cells.push(`<div class="${cellClasses.join(" ")}" data-calendar-day="${day}">
       <div class="team-cal-date">${Number(day.slice(8, 10))}</div>
       <div class="team-cal-items">
@@ -507,13 +501,12 @@ function cssEscape(value) {
   return String(value).replace(/["\\]/g, "\\$&");
 }
 
-function buildOverlapScenes(preferredRequestId) {
+function buildOverlapScenes(requestId = null) {
   const pending = requests.filter((row) => row.status === "pending" && overlapCount(row.overlap) > 0);
-  const preferred = pending.find((row) => row.id === preferredRequestId);
-  const ordered = preferred ? [preferred, ...pending.filter((row) => row.id !== preferredRequestId)] : pending;
+  const selected = requestId ? pending.filter((row) => row.id === requestId) : pending;
   const seen = new Set();
   const scenes = [];
-  for (const request of ordered) {
+  for (const request of selected) {
     for (const item of request.overlap?.items || []) {
       const key = overlapSceneKey(request, item);
       if (seen.has(key)) continue;
@@ -559,8 +552,8 @@ function renderOverlapNavigator() {
   const levelLabel = scene.level === "conflict" ? "Terminkonflikt" : "Team-Überschneidung";
   els.overlapNavigator.dataset.level = scene.level;
   els.overlapNavigatorEyebrow.innerHTML = `<i class="fa-solid ${scene.level === "conflict" ? "fa-triangle-exclamation" : "fa-users-viewfinder"}"></i> ${levelLabel}`;
-  els.overlapNavigatorTitle.textContent = `${scene.applicantName} & ${targetName}`;
-  els.overlapNavigatorRange.textContent = `${formatDeYmd(scene.overlapStart)} – ${formatDeYmd(scene.overlapEnd)}`;
+  els.overlapNavigatorTitle.textContent = `Urlaubsantrag von ${scene.applicantName}`;
+  els.overlapNavigatorRange.textContent = `Überschneidung mit ${targetName} · ${formatDeYmd(scene.overlapStart)} – ${formatDeYmd(scene.overlapEnd)}`;
   els.overlapNavigatorCounter.textContent = `${state.index + 1} / ${total}`;
   els.overlapNavigatorPrev.disabled = total < 2;
   els.overlapNavigatorNext.disabled = total < 2;
@@ -573,12 +566,9 @@ function animateFocusedOverlap(scene) {
     `[data-calendar-request-id="${cssEscape(scene.requestId)}"]`,
   );
   const target = els.adminTeamCalendar?.querySelector(overlapTargetSelector(scene.target));
-  const day = els.adminTeamCalendar?.querySelector(
-    `[data-calendar-day="${cssEscape(scene.overlapStart)}"]`,
-  );
-  const focusElement = day || primary || target;
+  const focusElement = primary || target;
   focusElement?.scrollIntoView({ behavior: "smooth", block: "center", inline: "center" });
-  [primary, target, day].filter(Boolean).forEach((element) => {
+  [primary, target].filter(Boolean).forEach((element) => {
     element.classList.remove("is-overlap-entering");
     void element.offsetWidth;
     element.classList.add("is-overlap-entering");
@@ -586,7 +576,7 @@ function animateFocusedOverlap(scene) {
   });
 }
 
-async function focusOverlapScene(index, { scrollPanel = false } = {}) {
+async function focusOverlapScene(index) {
   const state = overlapNavigatorState;
   if (!state?.scenes?.length) return;
   const focusGeneration = ++overlapFocusGeneration;
@@ -602,9 +592,6 @@ async function focusOverlapScene(index, { scrollPanel = false } = {}) {
   renderOverlapNavigator();
   const loaded = await loadTeamCalendar();
   if (!loaded || focusGeneration !== overlapFocusGeneration || overlapNavigatorState !== state) return;
-  if (scrollPanel) {
-    els.teamCalendarPanel?.scrollIntoView({ behavior: "smooth", block: "start" });
-  }
   requestAnimationFrame(() => requestAnimationFrame(() => animateFocusedOverlap(scene)));
 }
 
@@ -628,10 +615,11 @@ function closeOverlapNavigator({ clearHighlight = true } = {}) {
 async function showRequestInTeamCalendar(id) {
   const request = requests.find((row) => row.id === id);
   if (!request) return;
+  els.teamCalendarPanel?.scrollIntoView({ behavior: "smooth", block: "start" });
   const scenes = buildOverlapScenes(id);
   if (scenes.length) {
     overlapNavigatorState = { scenes, index: 0 };
-    await focusOverlapScene(0, { scrollPanel: true });
+    await focusOverlapScene(0);
     return;
   }
   closeOverlapNavigator({ clearHighlight: false });
@@ -643,7 +631,6 @@ async function showRequestInTeamCalendar(id) {
     teamCalendarMonth = new Date(year, month, 1);
   }
   await loadTeamCalendar();
-  els.teamCalendarPanel?.scrollIntoView({ behavior: "smooth", block: "start" });
   requestAnimationFrame(() => {
     const chip = els.adminTeamCalendar?.querySelector(`[data-calendar-request-id="${id}"]`);
     chip?.scrollIntoView({ behavior: "smooth", block: "center", inline: "center" });

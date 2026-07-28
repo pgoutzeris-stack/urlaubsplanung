@@ -218,12 +218,6 @@
     }
     .btn-show-calendar { background: var(--brand-light); border: 1px solid rgba(32,110,251,.24); color: var(--brand); }
     .btn-show-calendar:hover { border-color: var(--brand); background: var(--bg); }
-    .btn-show-calendar.has-overlap { position: relative; isolation: isolate; }
-    .btn-show-calendar.has-overlap::after {
-      content: ""; position: absolute; inset: -3px; z-index: -1; border: 1px solid rgba(32,110,251,.42);
-      border-radius: inherit; opacity: 0; animation: overlap-button-pulse 2.8s ease-out infinite;
-    }
-    .btn-show-calendar.has-overlap.is-conflict::after { border-color: rgba(220,38,38,.48); }
     .btn-show-calendar.is-active { background: var(--brand); border-color: var(--brand); color: #fff; }
     .btn-overlap-count {
       display: inline-flex; align-items: center; justify-content: center; min-width: 22px; height: 22px;
@@ -231,11 +225,6 @@
       box-shadow: 0 1px 4px rgba(15,23,42,.12);
     }
     .btn-show-calendar.is-conflict .btn-overlap-count { color: var(--danger); }
-    @keyframes overlap-button-pulse {
-      0%, 58% { opacity: 0; transform: scale(1); }
-      68% { opacity: .8; }
-      100% { opacity: 0; transform: scale(1.055); }
-    }
     .btn-approve { background: var(--success); color: #fff; }
     .btn-approve:hover { filter: brightness(1.05); }
     .btn-reject { background: var(--bg); border: 1px solid var(--line); color: var(--ink); }
@@ -394,24 +383,11 @@
       outline-color: #f59e0b;
       box-shadow: 0 0 0 4px rgba(245,158,11,.17);
     }
-    .team-cal-day.has-highlighted-request {
-      background: linear-gradient(180deg, var(--brand-light), var(--bg));
-      box-shadow: inset 0 0 0 2px rgba(32,110,251,.38);
-    }
-    .team-cal-day.has-highlighted-target { box-shadow: inset 0 0 0 2px rgba(245,158,11,.5); }
-    .team-cal-day.has-highlighted-request.has-highlighted-target {
-      box-shadow: inset 0 0 0 2px rgba(32,110,251,.5), inset 0 0 0 5px rgba(245,158,11,.28);
-    }
     .team-cal-chip.is-overlap-entering { animation: overlap-chip-focus 1s cubic-bezier(.2,.8,.2,1); }
-    .team-cal-day.is-overlap-entering { animation: overlap-day-focus 1s cubic-bezier(.2,.8,.2,1); }
     @keyframes overlap-chip-focus {
       0% { transform: translateY(4px) scale(.94); opacity: .45; }
       55% { transform: translateY(-1px) scale(1.04); opacity: 1; }
       100% { transform: none; opacity: 1; }
-    }
-    @keyframes overlap-day-focus {
-      0% { background-color: rgba(245,158,11,.2); }
-      100% { background-color: var(--bg); }
     }
     .overlap-navigator {
       position: absolute; top: 74px; right: 1.25rem; z-index: 8; width: min(360px, calc(100% - 2.5rem));
@@ -455,9 +431,7 @@
       .overlap-navigator { position: sticky; top: .75rem; right: auto; width: 100%; margin-bottom: .85rem; }
     }
     @media (prefers-reduced-motion: reduce) {
-      .btn-show-calendar.has-overlap::after,
-      .team-cal-chip.is-overlap-entering,
-      .team-cal-day.is-overlap-entering { animation: none; }
+      .team-cal-chip.is-overlap-entering { animation: none; }
       .overlap-navigator { transition: none; }
     }
 
@@ -942,7 +916,7 @@ window.RootsUser = window.RootsUser || {
 
 <script type="module">
 import { SB_URL, SB_ANON } from './config.js';
-import { initApp } from './app.js?v=20260728-overlap-navigator-v1';
+import { initApp } from './app.js?v=20260728-overlap-navigator-v2';
 
 const vacationTokenless = window.RootsUserBridge?.TOKENLESS_EMBED === true;
 const sb = vacationTokenless ? null : window.supabase.createClient(SB_URL, SB_ANON);
