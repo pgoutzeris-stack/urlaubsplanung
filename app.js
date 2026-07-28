@@ -627,7 +627,7 @@ function startAutoRefresh() {
   refreshTimer = setInterval(() => {
     if (els.dashboard?.style.display === "none") return;
     void refreshData();
-  }, 45000);
+  }, 15000);
   window.addEventListener("focus", onWindowFocus);
   if (isAdmin) startAdminRealtime();
 }
