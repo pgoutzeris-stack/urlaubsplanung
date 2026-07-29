@@ -828,7 +828,7 @@ async function loadStaffSettings(service: ReturnType<typeof createClient>) {
   const { data, error } = await service
     .schema("users")
     .from("profiles")
-    .select("id,full_name,email,kuerzel,urlaubstage")
+    .select("id,full_name,email,kuerzel,urlaubstage,urlaubstage_jahr")
     .order("full_name");
   if (error) throw error;
   const staff = (data ?? [])
@@ -841,6 +841,7 @@ async function loadStaffSettings(service: ReturnType<typeof createClient>) {
       full_name: p.full_name || p.email || "—",
       kuerzel: p.kuerzel || null,
       urlaubstage: getUrlaubstage(p),
+      urlaubstage_jahr: getAnnualVacationDays(p),
     }));
   return { staff };
 }
@@ -875,6 +876,12 @@ function getUrlaubstage(profile: { urlaubstage?: number | null } | null): number
   return DEFAULT_URLAUBSTAGE;
 }
 
+function getAnnualVacationDays(profile: { urlaubstage_jahr?: number | null } | null): number {
+  const n = profile?.urlaubstage_jahr;
+  if (typeof n === "number" && Number.isFinite(n)) return Math.max(0, n);
+  return DEFAULT_URLAUBSTAGE;
+}
+
 async function loadProfile(
   service: ReturnType<typeof createClient>,
   userId: string,
@@ -882,13 +889,13 @@ async function loadProfile(
   const profUsers = await service
     .schema("users")
     .from("profiles")
-    .select("id,full_name,email,app_role,urlaubstage,kuerzel")
+    .select("id,full_name,email,app_role,urlaubstage,urlaubstage_jahr,kuerzel")
     .eq("id", userId)
     .maybeSingle();
   if (!profUsers.error) return profUsers;
   return service
     .from("profiles")
-    .select("id,full_name,email,app_role,urlaubstage,kuerzel")
+    .select("id,full_name,email,app_role,urlaubstage,urlaubstage_jahr,kuerzel")
     .eq("id", userId)
     .maybeSingle();
 }
@@ -938,6 +945,7 @@ Deno.serve(async (req) => {
     email?: string;
     app_role?: string;
     urlaubstage?: number | null;
+    urlaubstage_jahr?: number | null;
     kuerzel?: string | null;
   } | null;
 
@@ -971,6 +979,7 @@ Deno.serve(async (req) => {
       if (scope === "balance") {
         const year = yearNow;
         const remaining = getUrlaubstage(profile);
+        const annualAllowance = getAnnualVacationDays(profile);
         const { data: mine, error: mineErr } = await service
           .from("urlaub_requests")
           .select("start_date,end_date,status,day_part")
@@ -1010,7 +1019,8 @@ Deno.serve(async (req) => {
             year,
             remaining,
             pending,
-            default_annual: DEFAULT_URLAUBSTAGE,
+            default_annual: annualAllowance,
+            annual_allowance: annualAllowance,
             roots_auto_deducted: rootsAutoDeducted,
           },
           200,
