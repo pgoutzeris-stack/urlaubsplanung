@@ -52,7 +52,7 @@ function escapeHtml(s) {
 }
 
 function formatDeYmd(ymd) {
-  if (!ymd) return "—";
+  if (!ymd) return "-";
   const d = new Date(ymd + "T12:00:00");
   return d.toLocaleDateString("de-DE", { day: "numeric", month: "short", year: "numeric" });
 }
@@ -131,7 +131,7 @@ function findLocalConflict(start, end) {
   for (const row of requests) {
     if (row.status !== "pending" && row.status !== "approved") continue;
     if (!rangesOverlap(start, end, row.start_date, row.end_date)) continue;
-    const range = `${formatDeYmd(row.start_date)} – ${formatDeYmd(row.end_date)}`;
+    const range = `${formatDeYmd(row.start_date)} - ${formatDeYmd(row.end_date)}`;
     if (row.status === "pending") {
       return `Für diesen Zeitraum liegt bereits ein ausstehender Antrag vor (${range}).`;
     }
@@ -401,7 +401,7 @@ function calendarChipIcon(item) {
 }
 
 function calendarChipTitle(item) {
-  const range = `${formatDeYmd(item.start_date)} – ${formatDeYmd(item.end_date)}`;
+  const range = `${formatDeYmd(item.start_date)} - ${formatDeYmd(item.end_date)}`;
   const prefix = item.source === "request" ? "Anfrage" : item.status === "system" ? "Firmenfrei" : item.title || "Kalender";
   const overlap = item.overlap?.summary ? ` · ${item.overlap.summary}` : "";
   return `${prefix}: ${item.member_name || "Team"} (${range})${overlap}`;
@@ -553,7 +553,7 @@ function renderOverlapNavigator() {
   els.overlapNavigator.dataset.level = scene.level;
   els.overlapNavigatorEyebrow.innerHTML = `<i class="fa-solid ${scene.level === "conflict" ? "fa-triangle-exclamation" : "fa-users-viewfinder"}"></i> ${levelLabel}`;
   els.overlapNavigatorTitle.textContent = `Urlaubsantrag von ${scene.applicantName}`;
-  els.overlapNavigatorRange.textContent = `Überschneidung mit ${targetName} · ${formatDeYmd(scene.overlapStart)} – ${formatDeYmd(scene.overlapEnd)}`;
+  els.overlapNavigatorRange.textContent = `Überschneidung mit ${targetName} · ${formatDeYmd(scene.overlapStart)} - ${formatDeYmd(scene.overlapEnd)}`;
   els.overlapNavigatorCounter.textContent = `${state.index + 1} / ${total}`;
   els.overlapNavigatorPrev.disabled = total < 2;
   els.overlapNavigatorNext.disabled = total < 2;
@@ -872,7 +872,7 @@ function renderOverlapSummary(overlap) {
         ? "1 Überschneidung"
         : `${count} Überschneidungen`;
   const tooltip = (overlap.items || [])
-    .map((item) => `${item.label}: ${formatDeYmd(item.start_date)} – ${formatDeYmd(item.end_date)}`)
+    .map((item) => `${item.label}: ${formatDeYmd(item.start_date)} - ${formatDeYmd(item.end_date)}`)
     .join(" · ");
   return `<span class="req-overlap-pill req-overlap-pill--${escapeHtml(level)}" title="${escapeHtml(tooltip || label)}">
     <i class="fa-solid ${icon}"></i>
@@ -928,7 +928,7 @@ function renderRequestCard(r, { showActions = false, showUserActions = false } =
     <div class="req-card-top">
       <div>
         <h3 class="req-name">${escapeHtml(r.applicant_name)}</h3>
-        <p class="req-range">${formatDeYmd(r.start_date)} – ${formatDeYmd(r.end_date)} · ${days} ${dayLabel}${halfBadge}</p>
+        <p class="req-range">${formatDeYmd(r.start_date)} - ${formatDeYmd(r.end_date)} · ${days} ${dayLabel}${halfBadge}</p>
       </div>
       <div class="req-card-pills">
         <span class="status-pill ${st.cls}"><i class="fa-solid ${st.icon}"></i> ${st.label}</span>
@@ -1165,7 +1165,7 @@ async function bootApp() {
   }
 }
 
-// Global: Halbtag-Chips zeigen/verstecken — außerhalb bindUi damit sie
+// Global: Halbtag-Chips zeigen/verstecken - außerhalb bindUi damit sie
 // auch beim Init-Aufruf nach dem Date-Setzen erreichbar ist
 function updateDaypartVisibility() {
   const wrap = document.getElementById("f-daypart-wrap");
